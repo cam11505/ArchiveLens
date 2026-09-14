@@ -3,6 +3,8 @@ import zlib
 from pathlib import Path, PurePosixPath
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
+from pyzipper.zipfile import BadZipFile as AESBadZipFile
+
 from archivelens import config
 from archivelens.archive.base import ArchiveEntry, ArchiveProvider
 from archivelens.archive.capabilities import ArchiveCapabilities, RandomAccess
@@ -10,8 +12,10 @@ from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.errors import (
     ArchiveAccessError,
     ArchiveNotOpenError,
+    BadPasswordError,
     CorruptedArchiveError,
     InvalidArchiveEntryError,
+    PasswordRequiredError,
     ResourceLimitError,
     UnsupportedArchiveError,
     UnsupportedCompressionError,
@@ -24,7 +28,11 @@ class ZipArchiveProvider(ArchiveProvider):
     """Read individual ZIP/CBZ members into RAM without extracting to disk."""
 
     capabilities = ArchiveCapabilities(
-        "ZIP / CBZ", ARCHIVE_EXTENSIONS, random_access=RandomAccess.EFFICIENT, solid=False
+        "ZIP / CBZ",
+        ARCHIVE_EXTENSIONS,
+        supports_passwords=True,
+        random_access=RandomAccess.EFFICIENT,
+        solid=False,
     )
 
     def __init__(self) -> None:
@@ -43,6 +51,14 @@ class ZipArchiveProvider(ArchiveProvider):
         self._credentials = credentials
         try:
             self._archive = ZipFile(path, mode="r")
+            if any(info.compress_type == 99 for info in self._archive.infolist()):
+                from pyzipper import AESZipFile
+
+                self._archive.close()
+                self._archive = AESZipFile(str(path), mode="r")
+            if len(self._archive.infolist()) > config.MAX_ARCHIVE_ENTRIES:
+                self.close()
+                raise ResourceLimitError()
             for index, info in enumerate(self._archive.infolist()):
                 if info.is_dir():
                     continue
@@ -60,7 +76,7 @@ class ZipArchiveProvider(ArchiveProvider):
         except OSError as exc:
             self.close()
             raise ArchiveAccessError() from exc
-        except (BadZipFile, UnicodeError, ValueError) as exc:
+        except (BadZipFile, AESBadZipFile, UnicodeError, ValueError) as exc:
             self.close()
             raise CorruptedArchiveError() from exc
 
@@ -83,8 +99,11 @@ class ZipArchiveProvider(ArchiveProvider):
         if member is None or member[0] is not entry:
             raise InvalidArchiveEntryError()
         info = member[1]
-        if info.flag_bits & 1:
+        password = self._credentials.password_bytes() if self._credentials else None
+        if info.flag_bits & (1 << 6):
             raise UnsupportedEncryptionError()
+        if info.flag_bits & 1 and password is None:
+            raise PasswordRequiredError()
         limit = config.MAX_ENTRY_UNCOMPRESSED_SIZE
         if (
             info.file_size > limit
@@ -92,7 +111,7 @@ class ZipArchiveProvider(ArchiveProvider):
         ):
             raise ResourceLimitError()
         try:
-            with self._archive.open(info, mode="r") as stream:
+            with self._archive.open(info, mode="r", pwd=password) as stream:
                 data = stream.read(limit + 1)
             if len(data) > limit or len(data) != info.file_size:
                 raise ResourceLimitError()
@@ -101,5 +120,9 @@ class ZipArchiveProvider(ArchiveProvider):
             raise ArchiveAccessError() from exc
         except NotImplementedError as exc:
             raise UnsupportedCompressionError() from exc
-        except (BadZipFile, RuntimeError, EOFError, zlib.error, lzma.LZMAError) as exc:
+        except RuntimeError as exc:
+            if info.flag_bits & 1:
+                raise BadPasswordError() from exc
+            raise CorruptedArchiveError() from exc
+        except (BadZipFile, AESBadZipFile, EOFError, zlib.error, lzma.LZMAError) as exc:
             raise CorruptedArchiveError() from exc

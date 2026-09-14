@@ -1,7 +1,8 @@
 include README.md README.zh-TW.md CHANGELOG.md LICENSE THIRD_PARTY_NOTICES.md
 include constraints-build.txt
 include Start-ArchiveLens.cmd
-recursive-include scripts *.py *.spec
+recursive-include scripts *.py *.spec *.iss
 recursive-include docs *.md
 recursive-include tests *.py
+recursive-include tests/fixtures *.rar *.md LICENSE
 recursive-include .github *.yml

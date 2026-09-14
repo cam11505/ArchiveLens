@@ -1,74 +1,52 @@
-# ArchiveLens 1.0
+# ArchiveLens 1.1 — 壓縮檔圖片與漫畫瀏覽器
 
-直接瀏覽 ZIP／CBZ 內的圖片，不必先將整份壓縮檔解壓。
+本機、唯讀、無遙測。直接瀏覽 ZIP／CBZ、7Z、RAR／CBR 內圖片，不整包解壓到資料夾。
+
+## 功能
+
+- JPG／JPEG、PNG、WebP、BMP、靜態／動畫 GIF；EXIF 自動方向。
+- ZipCrypto、AES ZIP（128／192／256）、加密 7Z、加密 RAR4／RAR5。
+- 密碼遮蔽、顯示密碼、重試與取消；密碼僅存在目前工作階段記憶體。
+- 自然排序、符合視窗、實體像素 100%、縮放、旋轉、拖移及全螢幕。
+- 單頁／雙頁、第一頁封面、由左至右／由右至左閱讀。
+- 延遲載入縮圖側欄，點擊縮圖跳頁；保留非敏感檢視偏好。
+- Windows x64 可攜 ZIP 與每使用者安裝程式，內含 UnRAR 後端，不需另裝解壓工具。
 
 ## 開始使用
 
-1. 從 [GitHub Releases](https://github.com/cam11505/ArchiveLens/releases) 下載
-   `ArchiveLens-1.0.0-windows-x64.zip`。
-2. 解壓**程式套件**，保留 `ArchiveLens.exe` 與 `_internal` 資料夾的相對位置。
-3. 執行 `ArchiveLens.exe`，拖入自己的 ZIP／CBZ，或按「開啟」。
+可攜版解開 ZIP 後執行 `ArchiveLens.exe`，保留旁邊的 `_internal`。
+安裝版預設安裝在 `%LocalAppData%\Programs\ArchiveLens`，不需管理員權限。
+建立開始功能表捷徑；桌面捷徑可選。不更改 ZIP／RAR／7Z 等預設關聯，透過「開啟方式」選用。
 
-不需要安裝 Python。解壓程式套件與解壓照片檔案是不同的事情：程式只將目前與少量鄰頁
-圖片讀入 RAM，不會將照片解壓到資料夾，也不會修改原始壓縮檔。
-
-## v1.0 功能
-
-- ZIP／CBZ 唯讀瀏覽、自然排序、Unicode 路徑。
-- JPG、JPEG、PNG、WebP、BMP、GIF 第一幀；自動套用 EXIF Orientation。
-- 上一張／下一張、頁碼、符合視窗、100%、縮放、拖移、左右旋轉、全螢幕。
-- 背景載入與預讀，快速翻頁時舊結果不覆蓋目前頁面。
-- 256 MiB LRU 快取，最多保留目前、前一張及後兩張。
-- 加密、損壞、無圖片、過大 entry／圖片等可恢復錯誤提示。
-- 本機執行，無圖片上傳、遙測、帳號或自動更新。
-
-## 快捷鍵
-
-| 操作 | 按鍵 |
+| 操作 | 功能 |
 | --- | --- |
-| 開啟 | Ctrl+O |
-| 下一張 | → / PageDown / Space |
-| 上一張 | ← / PageUp / Backspace |
-| 第一張／最後一張 | Home / End |
-| 放大／縮小 | + / = / - |
-| 符合視窗／100% | 0 / 1 |
-| 向右／向左旋轉 | R / Shift+R |
-| 全螢幕／離開全螢幕 | F / F11 / Esc |
-| 縮放 | Ctrl+滑鼠滾輪 |
-| 捲動／拖移 | 一般滾輪／按住左鍵拖曳 |
-| 操作說明／結束 | F1 / Ctrl+Q |
+| Ctrl+O／拖入壓縮檔 | 開啟 |
+| ←／→ | 依閱讀方向翻頁 |
+| PageUp／Backspace；PageDown／Space | 邏輯上一頁／下一頁（雙頁時為上一組／下一組） |
+| Home／End | 第一組／最後一組 |
+| 0／1 | 符合完整跨頁／100% 實體像素 |
+| +／-／Ctrl+滾輪 | 縮放 |
+| R／Shift+R | 向右／向左旋轉 |
+| F／F11／Esc | 全螢幕／退出 |
+| T | 縮圖側欄 |
 
-100% 代表一個圖片像素對應一個螢幕實體像素，會考慮 Windows 顯示縮放比例。
-翻頁保留 Fit／手動縮放模式，但重設旋轉角度。開啟新壓縮檔時回到 Fit。
-在第一張／最後一張繼續翻頁會停留原頁。
+「檢視」與「閱讀」選單可設定雙頁、封面及閱讀方向。GIF 自動播放，離開頁面即停止。
 
 ## 限制
 
-- Windows 10／11 x64 為目標；可攜版不包含簽章、安裝精靈或檔案關聯。
-- 單 entry 解壓上限 128 MiB、壓縮比上限 1000、圖片上限 4,000 萬像素；
-  Qt 單次解碼配置上限 256 MiB。這些不是整個程序的總 RAM 上限。
-- 大型目錄、慢速磁碟及複雜壓縮資料仍可能需要等待；關閉時會等目前工作安全結束。
-- GIF 只顯示第一幀。加密 ZIP、RAR／7Z、縮圖、雙頁、書籤與最近檔案不屬於 v1.0。
-- ZIP 檔名依 UTF-8 flag／CP437 解讀，尚未提供舊式 Big5／CP932 手動選碼。
-- 本機診斷紀錄位於作業系統的應用程式資料目錄，每檔 1 MiB、最多三檔；
-  `--debug` 可能包含本機檔名，不記錄圖片內容。
+只支援單一檔案壓縮檔，不支援多卷、巢狀壓縮檔、修改／刪除內容或儲存密碼。
+7Z 重複檔名不支援；RAR 連結項目略過。solid 壓縮檔不預讀鄰頁，翻頁可能較慢。
+7Z 與部分舊式加密格式無法完全區分密碼錯誤和資料損壞。
 
-## 從原始碼啟動與開發
+最多 100,000 個項目、單筆解壓 128 MiB、圖片 4,000 萬像素；圖片快取 256 MiB、
+縮圖快取 64 MiB、單一 GIF 32 MiB；7Z／RAR 解壓大小總計上限 1 GiB。
+這些是個別元件限制，不代表程序總 RAM 上限，也不是惡意檔案沙箱。
+密碼不寫入設定、命令列或日誌；Python 無法保證清除後端所有不可變記憶體副本。
 
-需要 Python 3.12+。於專案目錄執行：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -c constraints-build.txt -e ".[dev,build]"
-.\.venv\Scripts\python.exe -m archivelens
-.\.venv\Scripts\python.exe -m pytest -q
-```
-
-也可雙擊 `Start-ArchiveLens.cmd`。安裝需要下載相依套件，程式本身可離線操作。
-完整架構、打包與檢查指令見 [英文 README](README.md) 及
-[開發與驗收紀錄](docs/DEVELOPMENT.md)。
+原始碼執行與打包指令見 [English README](README.md)。開發及驗證狀態见
+[DEVELOPMENT](docs/DEVELOPMENT.md)、[v1.1 QA](docs/V1.1_QA.md)。
 
 ## 授權
 
-ArchiveLens 原始碼使用 MIT License。Python／Qt／PySide6 等保留原授權；
-詳見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+ArchiveLens 採 MIT；第三方元件保留各自授權。Qt 與部分解壓函式庫為 LGPL，
+發布時附精確版本來源及授權。詳見 [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md)。

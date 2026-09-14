@@ -44,3 +44,26 @@ instructions and the PyInstaller spec are included in the project source.
 References: [Qt licensing](https://doc.qt.io/qt-6/licensing.html),
 [Qt third-party notices](https://doc.qt.io/qt-6/licenses-used-in-qt.html),
 [PyInstaller license](https://pyinstaller.org/en/stable/license.html).
+
+## Archive backends added in 1.1
+
+- pyzipper 0.4.0: MIT and inherited Python license; pycryptodomex 3.23.0:
+  BSD/public-domain components.
+- py7zr 1.1.3, pybcj 1.0.8, pyppmd 1.3.1, inflate64 1.0.4,
+  multivolumefile 0.2.3: LGPL-2.1-or-later.
+- Brotli 1.2.0 and texttable 1.7.0: MIT; psutil 7.2.2: BSD-3-Clause;
+  backports.zstd 1.7.0: PSF-2.0 with bundled Zstandard license notices.
+- UnRAR64.dll 7.21: official UnRAR DLL freeware license, copyright Alexander Roshal.
+  The SDK permits use in software handling RAR archives. Full license:
+  `licenses/UNRAR-LICENSE.txt`. No WinRAR compressor is distributed.
+- Diagnostic RAR fixtures: Copyright Marko Kreen, ISC; license accompanies fixtures.
+- Inno Setup 6.7.3: installer engine by Jordan Russell and Martijn Laan;
+  see https://github.com/jrsoftware/issrc/blob/is-6_7_3/license.txt .
+
+Exact package license files are under `licenses/<package>/`, with version records
+in `licenses/archive-backends.json`. Corresponding source distributions accompany
+the release and are hashed in `licenses/upstream-sources.json`.
+ArchiveLens permits reverse engineering for debugging modifications to LGPL
+libraries. Its MIT source and build scripts allow rebuilding with modified versions;
+compatible native libraries can also be replaced in the installed `_internal` folder.
+See [backend decisions](docs/BACKENDS.md) for provenance and limitations.

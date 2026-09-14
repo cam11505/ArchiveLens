@@ -12,6 +12,9 @@ def create_portable(path, corrupt=False, development=False):
         name: b"fixture"
         for name in [
             "ArchiveLens.exe",
+            "_internal/native/UnRAR64.dll",
+            "licenses/UNRAR-LICENSE.txt",
+            "licenses/archive-backends.json",
             "LICENSE",
             "THIRD_PARTY_NOTICES.md",
             "licenses/upstream-sources.json",
@@ -22,7 +25,7 @@ def create_portable(path, corrupt=False, development=False):
         ]
     }
     files["build-info.json"] = json.dumps(
-        {"version": "1.0.0", "source_commit": "a" * 40, "development": development}
+        {"version": "1.1.0", "source_commit": "a" * 40, "development": development}
     ).encode()
     manifest = {
         name: {"size": len(content), "sha256": hashlib.sha256(content).hexdigest()}
@@ -39,7 +42,7 @@ def create_portable(path, corrupt=False, development=False):
 def test_release_commit_hash_and_inventory(tmp_path):
     path = tmp_path / "portable.zip"
     create_portable(path)
-    assert verify_archive(path, "a" * 40)["version"] == "1.0.0"
+    assert verify_archive(path, "a" * 40)["version"] == "1.1.0"
     with pytest.raises(ValueError, match="different commit"):
         verify_archive(path, "b" * 40)
     with ZipFile(path, "a") as target:

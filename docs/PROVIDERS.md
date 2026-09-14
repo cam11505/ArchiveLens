@@ -1,8 +1,8 @@
 # Provider development (issue #2)
 
 `ArchiveProviderRegistry` is the shared selection boundary for the worker, CLI,
-file dialog and drag/drop. The default registry enables ZIP/CBZ only. Password
-reading/dialogs (#3), 7Z (#4), and RAR/CBR (#5) remain separate work.
+file dialog and drag/drop. The default registry enables ZIP/CBZ and 7Z; RAR/CBR is available when the
+bundled Windows UnRAR DLL is present. Backend details are in BACKENDS.md.
 
 ## Adding a backend
 
@@ -51,8 +51,8 @@ retaining copies. Credentials are never stored in settings, files or logs.
 Worker results carry a canonical localized message and `error_type` (the exception
 class), never the backend exception object/traceback. Load, prefetch and cleanup
 logs exclude backend messages and tracebacks. CLI also uses canonical messages.
-ZIP currently reports `UnsupportedEncryptionError` for encrypted entries even when
-credentials are supplied: this foundation does not implement password reading.
+ZIP supports ZipCrypto/AES using supplied credentials; strong encryption outside
+the documented support reports UnsupportedEncryptionError.
 
 ## Validation
 

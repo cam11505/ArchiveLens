@@ -1,8 +1,9 @@
-from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QImage, QPixmap, QResizeEvent, QTransform, QWheelEvent
+from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QSize, Qt, Signal
+from PySide6.QtGui import QImage, QMovie, QPixmap, QResizeEvent, QTransform, QWheelEvent
 from PySide6.QtWidgets import QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
 
 from archivelens.config import MAX_ZOOM, MIN_ZOOM, ZOOM_STEP
+from archivelens.image.media import PageMedia
 
 
 class ImageViewer(QGraphicsView):
@@ -19,6 +20,8 @@ class ImageViewer(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self._item: QGraphicsPixmapItem | None = None
+        self._movies = []
+        self._group = None
         self.fit_mode = True
         self.zoom_factor = 1.0
         self.rotation = 0
@@ -41,6 +44,16 @@ class ImageViewer(QGraphicsView):
         self.clear_image()
 
     def clear_image(self) -> None:
+        for movie, buffer in self._movies:
+            movie.stop()
+            movie.frameChanged.disconnect()
+            movie.setDevice(None)
+            buffer.close()
+            buffer.setData(QByteArray())
+            movie.deleteLater()
+            buffer.deleteLater()
+        self._movies.clear()
+        self._group = None
         self.scene().clear()
         self._item = None
         self.rotation = 0
@@ -49,16 +62,51 @@ class ImageViewer(QGraphicsView):
         self.scene().setSceneRect(0, 0, 0, 0)
 
     def set_image(self, image: QImage) -> None:
+        self.set_pages((PageMedia(0, image),))
+
+    def set_pages(self, pages: tuple[PageMedia, ...], rtl=False) -> None:
         self.clear_image()
-        self.image_size = image.size()
-        pixmap = QPixmap.fromImage(image)
-        pixmap.setDevicePixelRatio(1)
-        self._item = self.scene().addPixmap(pixmap)
-        self._item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
-        self._item.setTransformOriginPoint(self._item.boundingRect().center())
-        self.scene().setSceneRect(self._item.sceneBoundingRect())
+        items = []
+        x = 0
+        for page in reversed(pages) if rtl else pages:
+            pixmap = QPixmap.fromImage(page.image)
+            pixmap.setDevicePixelRatio(1)
+            item = self.scene().addPixmap(pixmap)
+            item.setPos(x, 0)
+            x += page.image.width() + 12
+            item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+            items.append(item)
+            if page.animation:
+                buffer = QBuffer(self)
+                buffer.setData(QByteArray(page.animation))
+                buffer.open(QIODevice.OpenModeFlag.ReadOnly)
+                movie = QMovie(buffer, QByteArray(b"gif"), self)
+                movie.setCacheMode(QMovie.CacheMode.CacheNone)
+
+                frame_size = page.image.size()
+
+                def frame_changed(_, movie=movie, item=item, size=frame_size):
+                    frame = movie.currentImage()
+                    if frame.size() != size:
+                        movie.stop()
+                        return
+                    item.setPixmap(QPixmap.fromImage(frame))
+
+                movie.frameChanged.connect(frame_changed)
+                self._movies.append((movie, buffer))
+        if not items:
+            return
+        self._item = items[0]
+        self.image_size = QSize(x - 12, max(page.image.height() for page in pages))
+        if len(items) > 1:
+            self._group = self.scene().createItemGroup(items)
+        root = self._group or self._item
+        root.setTransformOriginPoint(root.boundingRect().center())
+        self.scene().setSceneRect(root.sceneBoundingRect())
         self._apply_view()
-        self.centerOn(self._item)
+        self.centerOn(self.sceneRect().center())
+        for movie, _ in self._movies:
+            movie.start()
 
     def fit_image(self) -> None:
         self.fit_mode = True
@@ -84,10 +132,11 @@ class ImageViewer(QGraphicsView):
         if self._item is None:
             return
         self.rotation = (self.rotation + degrees) % 360
-        self._item.setRotation(self.rotation)
-        self.scene().setSceneRect(self._item.sceneBoundingRect())
+        root = self._group or self._item
+        root.setRotation(self.rotation)
+        self.scene().setSceneRect(root.sceneBoundingRect())
         self._apply_view()
-        self.centerOn(self._item)
+        self.centerOn(self.sceneRect().center())
 
     def _apply_view(self) -> None:
         if self._item is None or self._updating:
@@ -97,7 +146,7 @@ class ImageViewer(QGraphicsView):
             self._set_scrollbars(not self.fit_mode)
             dpr = self.devicePixelRatioF()
             if self.fit_mode:
-                rect = self._item.sceneBoundingRect()
+                rect = self.sceneRect()
                 scale = min(
                     max(1, self.viewport().width() - 4) / rect.width(),
                     max(1, self.viewport().height() - 4) / rect.height(),
@@ -105,7 +154,7 @@ class ImageViewer(QGraphicsView):
                 self.zoom_factor = scale * dpr
             self.setTransform(QTransform.fromScale(self.zoom_factor / dpr, self.zoom_factor / dpr))
             if self.fit_mode:
-                self.centerOn(self._item)
+                self.centerOn(self.sceneRect().center())
             self.zoom_changed.emit(self.zoom_factor)
         finally:
             self._updating = False

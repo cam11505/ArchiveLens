@@ -58,7 +58,14 @@ def main() -> int:
         "platform": platform.platform(),
         "dependencies": {
             name: importlib.metadata.version(name)
-            for name in ["PySide6", "shiboken6", "pyinstaller"]
+            for name in [
+                "PySide6",
+                "shiboken6",
+                "pyinstaller",
+                "pyzipper",
+                "py7zr",
+                "pycryptodomex",
+            ]
         },
         "source_files": {
             str(path.relative_to(root)).replace("\\", "/"): sha256(path)

@@ -1,155 +1,87 @@
-# ArchiveLens
+# ArchiveLens 1.1 — archive image and comic viewer
 
-Browse images directly inside ZIP / CBZ archives without extracting the entire archive.
+[繁體中文](README.zh-TW.md)
 
-[繁體中文](README.zh-TW.md) · Windows 10/11 x64 · Python 3.12+
+A local, read-only Windows image viewer for ZIP/CBZ, 7Z and RAR/CBR.
+Open images without extracting an archive into a folder. No telemetry or cloud service.
 
 ## Features
 
-- Open ZIP/CBZ from a file dialog, drag and drop, or a command-line argument.
-- Browse naturally sorted images with Previous/Next and keyboard navigation.
-- Fit images to the window without changing their aspect ratio; respect EXIF orientation.
-- Decode individual images in RAM on a background thread. No extracted image files.
-- Local, read-only operation: no archive modification, uploads, telemetry or accounts.
-- Resource guards and recoverable errors for damaged, encrypted or oversized entries.
-- Physical-pixel 100%, zoom, Ctrl+wheel, drag panning, rotation and fullscreen.
-- A 256 MiB decoded-image LRU cache and previous/next-two-image background prefetch.
+- JPG/JPEG, PNG, WebP, BMP, static and animated GIF; EXIF orientation.
+- Plain and ZipCrypto/AES ZIP (128/192/256), encrypted 7Z, encrypted RAR4/RAR5.
+- Masked password dialog with show-password, retry and Cancel; memory-only credentials.
+- Natural page ordering, fit, physical-pixel 100%, zoom, rotation, pan and fullscreen.
+- Single/double pages, optional first-page cover, LTR/RTL reading.
+- Lazy thumbnail sidebar with its own bounded cache; click to jump.
+- Non-sensitive viewer preferences saved between runs.
+- Windows x64 portable ZIP and per-user installer; bundled UnRAR requires no external setup.
 
-**Version 1.0.0** implements the original ZIP/CBZ viewer MVP. See
-[CHANGELOG.md](CHANGELOG.md) and [verification details](docs/DEVELOPMENT.md).
+## Run
 
-## Installation
+Download the portable ZIP and run `ArchiveLens.exe`, or run the setup EXE.
+The installer registers Open With and a Start Menu shortcut; desktop shortcut is optional.
+It does not change default archive associations. Keep `_internal` beside the portable EXE.
 
-**Windows portable:** download `ArchiveLens-1.0.0-windows-x64.zip` from
-[GitHub Releases](https://github.com/cam11505/ArchiveLens/releases), extract the
-application folder, then run `ArchiveLens.exe`. Keep `_internal` beside the EXE.
-Python is included. Extracting this application package is separate from viewing
-your photo archives: the viewer never extracts their images to disk.
-
-**From source:** requires Python 3.12+ with pip. From this project directory:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install .
-```
-
-Dependencies are downloaded during installation. The application itself operates offline.
-The portable build is unsigned; code signing and installers are outside v1.0.
-
-## Development Setup
+From source (Python 3.12+):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -c constraints-build.txt -e ".[dev,build]"
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe -m ruff check src tests scripts
-.\.venv\Scripts\python.exe -m ruff format --check src tests scripts
-```
-
-## Run
-
-```powershell
+.\.venv\Scripts\python.exe scripts/prepare_backends.py
 .\.venv\Scripts\python.exe -m archivelens
-.\.venv\Scripts\python.exe -m archivelens photos.zip
-.\.venv\Scripts\python.exe -m archivelens.cli photos.zip
 ```
 
-After setting up a source checkout, double-click `Start-ArchiveLens.cmd` to launch.
-You may also drop a ZIP/CBZ onto that launcher.
-For diagnostic tracebacks, launch from a terminal with `-m archivelens --debug`.
+`prepare_backends.py` downloads and verifies the official UnRAR 7.21 SDK on Windows.
+ZIP/7Z source use is cross-platform; RAR requires the bundled Windows DLL.
+`python -m archivelens.cli book.cbz` lists images; the CLI does not prompt for passwords.
 
-## Keyboard Shortcuts
+## Controls
 
-| Key | Action |
+| Control | Action |
 | --- | --- |
-| Ctrl+O | Open archive |
-| Right / PageDown / Space | Next image |
-| Left / PageUp / Backspace | Previous image |
-| Home / End | First / last image |
-| 0 | Fit to window |
-| 1 | Actual size: one image pixel per physical screen pixel |
-| + / = / - | Zoom in / out |
+| Ctrl+O / drag archive | Open |
+| Left / Right | Previous/next according to reading direction |
+| PageUp / Backspace; PageDown / Space | Logical previous; next page/spread |
+| Home / End | First / last spread |
+| 0 / 1 | Fit complete spread / physical-pixel 100% |
+| + / - / Ctrl+wheel | Zoom |
 | R / Shift+R | Rotate right / left |
-| F / F11 / Esc | Toggle / exit fullscreen |
-| Ctrl+wheel | Zoom at the pointer |
-| Mouse wheel / left-button drag | Scroll / pan |
-| F1 / Ctrl+Q | Help / quit |
+| F / F11 / Esc | Fullscreen / leave fullscreen |
+| T | Thumbnail sidebar |
 
-Navigation stops at both ends. Fit mode follows window size. Manual zoom is retained
-across pages; rotation resets per image. Opening another archive resets to fit mode.
+Use View and Reading menus for single/double page, direction and cover settings.
 
-## Supported Formats
+## Limits and supported cases
 
-- Archives: ZIP and CBZ only.
-- Images: JPG, JPEG, PNG, WebP, BMP, GIF (first frame).
-- Unicode filenames follow ZIP UTF-8/CP437 metadata. Legacy Big5/CP932 overrides
-  and password input are not available yet.
+Single-volume archives only. No nested archives, editing, deletion, extraction, recent-file
+history, or persistent passwords. Unsupported compression/encryption gives a recoverable error.
+7Z duplicate member names and RAR links/multipart archives are not supported. Solid archives
+use conservative requested-page reads without speculative prefetch; large solid files can be slow.
+Wrong-password and corruption can be ambiguous for 7Z and some older encrypted formats.
 
-## Resource Limits
+Limits: 100,000 directory entries, 128 MiB per decoded archive member, 40 million image pixels,
+256 MiB image cache, 64 MiB thumbnail cache, 32 MiB per GIF stream, and 1 GiB total 7Z/RAR
+uncompressed catalog. These are component limits, not a total-process RAM guarantee or sandbox.
+Passwords never enter command lines, logs or settings; Python cannot erase every immutable
+backend memory copy. See [provider contract](docs/PROVIDERS.md) and [backend record](docs/BACKENDS.md).
 
-Limits in `src/archivelens/config.py`: 128 MiB uncompressed per entry, a maximum
-compression ratio of 1000, 40 million image pixels, and a 256 MiB Qt decoding
-allocation limit. These are individual safeguards, not a total process RAM limit.
-Highly compressible legitimate images may also be rejected.
-
-Archive opening reads the directory and requested image first. Idle time is used
-to prefetch the next two images and previous image. The 256 MiB cache uses actual
-decoded allocation sizes and retains at most this four-page window. One active load
-and one replaceable pending request prevent an unbounded work queue; current requests
-take priority over further prefetch. Closing waits for the active operation to finish.
-
-These guards do not make arbitrary untrusted input a sandbox. Large directories,
-slow storage and unusually complex compressed data may still take time. Local
-diagnostic logs are bounded to three 1 MiB files under the OS application-data
-directory; `--debug` can include local filenames. No image bytes are logged.
-
-## Roadmap
-
-Later versions may add recent files, bookmarks, thumbnails, password entry, RAR/7Z,
-animated GIF and comic-reading layouts. None of these are part of v1.0.
-
-## Verification
-
-Tests generate their own tiny archives and images in pytest temporary directories.
-They cover lazy reads, unchanged source archives, Unicode, sorting, duplicate names,
-resource guards, damaged/encrypted data, Qt decoding and GUI event flows.
-GUI tests use Qt's offscreen platform. A native-window smoke check can be run with:
+## Development and release
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\smoke_gui.py
-.\.venv\Scripts\python.exe -m archivelens --self-test-report outputs\self-test.json
+python -m pytest -q
+python -m ruff check src tests scripts
+python -m ruff format --check src tests scripts
+python scripts/prepare_licenses.py
+python scripts/build_portable.py
+python scripts/package_release.py
+python scripts/build_installer.py --iscc outputs/inno/ISCC.exe
+python scripts/verify_release.py dist/release/ArchiveLens-1.1.0-windows-x64.zip --run
 ```
 
-This generates a small synthetic demo CBZ and a screenshot under `outputs/smoke/`.
-It is not a substitute for manual Explorer drag-and-drop or multi-monitor/DPI testing.
-
-## Build a Windows Portable Package
-
-```powershell
-.\.venv\Scripts\python.exe scripts\prepare_licenses.py
-.\.venv\Scripts\python.exe scripts\build_portable.py
-.\.venv\Scripts\python.exe scripts\package_release.py
-.\.venv\Scripts\python.exe scripts\verify_release.py dist\release\ArchiveLens-1.0.0-windows-x64.zip --run
-```
-
-The first command downloads exact-version Qt/PySide source archives and licenses.
-The other commands build locally. Build from a clean Git checkout for a release.
-The ZIP contains checksums and commit/build information; verification checks every
-file and runs the packaged EXE outside the source tree with a sanitized environment.
-
-GitHub Actions runs tests and the packaged self-test on Windows; Linux also runs
-the source tests. Only Windows x64 is distributed as a portable binary in v1.0.
-
-## Architecture
-
-- `archive/`: read-only provider registry, capabilities, ephemeral credentials, ZIP/CBZ provider
-  and sorted image catalog. See [provider development](docs/PROVIDERS.md).
-- `image/`: in-memory Qt image decoding.
-- `ui/`: main window and image viewer.
-- `utils/`: natural ordering and file extension filtering.
-- `config.py`: centralized resource limits.
+Release packaging requires a clean committed tree; use `--development` only for local diagnostics.
+[Development](docs/DEVELOPMENT.md), [release QA](docs/V1.1_QA.md), and [v1.1 plan](docs/V1.1_PLAN.md).
 
 ## License
 
-MIT for ArchiveLens. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled
-Python/Qt/PySide licenses and corresponding source archives.
+ArchiveLens is MIT. Qt and several archive libraries use LGPL; corresponding sources and
+licenses are distributed with releases. See [third-party notices](THIRD_PARTY_NOTICES.md).

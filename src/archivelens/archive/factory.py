@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from archivelens.archive.base import ArchiveProvider
+from archivelens.archive.rar_provider import RarArchiveProvider
+from archivelens.archive.sevenzip_provider import SevenZipArchiveProvider
 from archivelens.archive.zip_provider import ZipArchiveProvider
 from archivelens.errors import ProviderUnavailableError, UnsupportedArchiveError
 
@@ -51,3 +53,7 @@ class ArchiveProviderRegistry:
 
 DEFAULT_REGISTRY = ArchiveProviderRegistry()
 DEFAULT_REGISTRY.register(ZipArchiveProvider)
+
+DEFAULT_REGISTRY.register(SevenZipArchiveProvider)
+
+DEFAULT_REGISTRY.register(RarArchiveProvider)

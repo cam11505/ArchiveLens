@@ -16,6 +16,7 @@ def make_action(
 
 def make_toolbar(window: QMainWindow, actions: list[QAction]) -> QToolBar:
     toolbar = QToolBar("導覽", window)
+    toolbar.setObjectName("navigation_toolbar")
     toolbar.setMovable(False)
     for action in actions:
         toolbar.addAction(action)

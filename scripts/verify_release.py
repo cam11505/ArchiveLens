@@ -44,6 +44,9 @@ def verify_archive(
                 raise ValueError(f"SHA-256 mismatch: {name}")
         required = {
             "ArchiveLens.exe",
+            "_internal/native/UnRAR64.dll",
+            "licenses/UNRAR-LICENSE.txt",
+            "licenses/archive-backends.json",
             "LICENSE",
             "THIRD_PARTY_NOTICES.md",
             "build-info.json",
@@ -57,8 +60,13 @@ def verify_archive(
             raise ValueError("Required application files are missing")
         if any(PurePosixPath(name).name.lower() == "icuuc.dll" for name in manifest):
             raise ValueError("Bundled ICU would shadow the Windows system ICU ABI")
+        if any(
+            any(part in name.lower() for part in ("virtualkeyboard", "qt6qml", "qt6quick"))
+            for name in manifest
+        ):
+            raise ValueError("Unused Qt modules must not be distributed")
         build = json.loads(archive.read("ArchiveLens/build-info.json"))
-        if build["version"] != "1.0.0":
+        if build["version"] != "1.1.0":
             raise ValueError("Unexpected release version")
         if build["development"] and not allow_development:
             raise ValueError("This is a development package, not a release")
@@ -95,7 +103,7 @@ def run_packaged_test(path: Path, output: Path) -> dict:
         startup.wShowWindow = subprocess.SW_HIDE
         subprocess.run(command, cwd=target, env=env, startupinfo=startup, check=True, timeout=60)
         result = json.loads(report.read_text(encoding="utf-8"))
-        if not result["success"] or len(result["checks"]) < 8:
+        if not result["success"] or len(result["checks"]) < 15:
             raise ValueError("Packaged application did not pass all acceptance checks")
         return result
 

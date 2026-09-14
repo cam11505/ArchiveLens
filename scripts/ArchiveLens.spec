@@ -6,19 +6,21 @@ root = Path(SPECPATH).parent
 a = Analysis(
     [str(root / "scripts" / "frozen_entry.py")],
     pathex=[str(root / "src")],
-    binaries=[],
-    datas=[],
+    binaries=[(str(root / "outputs/backends/UnRAR64.dll"), "native")],
+    datas=[(str(root / "tests/fixtures/rar"), "self-test-rar")],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "PySide6.QtPdf", "PySide6.QtSvg", "PySide6.QtQml",
+    excludes=["setuptools", "pkg_resources", "tkinter", "PySide6.QtPdf", "PySide6.QtSvg", "PySide6.QtQml",
               "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets"],
     noarchive=False,
 )
 allowed_images = {"qjpeg.dll", "qgif.dll", "qwebp.dll"}
 def required_binary(item):
     name = item[0].replace("\\", "/").lower()
+    if any(part in name for part in ("virtualkeyboard", "qt6qml", "qt6quick")):
+        return False
     if "/imageformats/" in name:
         return name.rsplit("/", 1)[-1] in allowed_images
     # Qt uses the Windows ICU ABI; a different ICU found on PATH is incompatible.

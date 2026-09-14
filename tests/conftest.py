@@ -45,3 +45,16 @@ def wait_until(qapp):
         qapp.processEvents()
 
     return wait
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings(tmp_path, monkeypatch):
+    from PySide6.QtCore import QSettings
+
+    import archivelens.ui.main_window as main_window
+
+    monkeypatch.setattr(
+        main_window,
+        "create_settings",
+        lambda: QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat),
+    )

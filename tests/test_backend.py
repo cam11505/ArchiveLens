@@ -12,9 +12,9 @@ from archivelens.errors import (
     ArchiveAccessError,
     ArchiveLensError,
     CorruptedArchiveError,
+    PasswordRequiredError,
     ResourceLimitError,
     UnsupportedArchiveError,
-    UnsupportedEncryptionError,
 )
 from archivelens.utils.file_types import is_image
 from archivelens.utils.natural_sort import natural_sort_key
@@ -145,5 +145,5 @@ def test_encrypted_entry(tmp_path):
     path.write_bytes(data)
     with ZipArchiveProvider() as provider:
         provider.open(path)
-        with pytest.raises(UnsupportedEncryptionError, match="加密"):
+        with pytest.raises(PasswordRequiredError):
             provider.read_entry(provider.list_entries()[0])

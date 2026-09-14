@@ -27,7 +27,15 @@ def main() -> int:
     configure_logging(
         args.debug, args.self_test_report.parent / "logs" if args.self_test_report else None
     )
-    window = MainWindow()
+    settings = None
+    if args.self_test_report:
+        from PySide6.QtCore import QSettings
+
+        settings = QSettings(
+            str(args.self_test_report.with_suffix(".ini")), QSettings.Format.IniFormat
+        )
+        settings.clear()
+    window = MainWindow(settings=settings)
     window.show()
     if args.self_test_report:
         from PySide6.QtCore import QTimer

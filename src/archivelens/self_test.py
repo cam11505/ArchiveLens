@@ -24,7 +24,10 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from archivelens import __version__
+from archivelens.backend_self_test import check_backends
+from archivelens.diagnostic_fixtures import animated_gif
 from archivelens.image.loader import decode_image
+from archivelens.image.media import PageMedia
 from archivelens.ui.main_window import MainWindow
 
 
@@ -35,9 +38,9 @@ def demo_image(fmt: str, label: str, color: str) -> bytes:
     painter.fillRect(70, 70, 1060, 660, QColor(color))
     painter.setPen(QColor("white"))
     painter.setFont(QFont("Arial", 46))
-    painter.drawText(125, 200, "ArchiveLens 1.0")
+    painter.drawText(125, 200, "ArchiveLens 1.1")
     painter.setFont(QFont("Arial", 24))
-    painter.drawText(125, 285, "ZIP / CBZ image viewer")
+    painter.drawText(125, 285, "Archive image and comic viewer")
     painter.drawText(125, 620, label)
     painter.end()
     data = QByteArray()
@@ -85,6 +88,7 @@ class SelfTestRunner(QObject):
                 base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
             )
             self.checks.append("required_image_decoders")
+            self.checks.extend(check_backends(demo_image("PNG", "Backend", "#286a72")))
             self.source_hash = hashlib.sha256(self.archive.read_bytes()).hexdigest()
             self.window.activateWindow()
             mime = QMimeData()
@@ -163,7 +167,7 @@ class SelfTestRunner(QObject):
                 self._page(3)
                 self.checks.append("webp_last_page_boundary")
                 self.window.go_to(1)
-            else:
+            elif self.phase == 7:
                 self._page(1)
                 if self.screenshot:
                     self.screenshot.parent.mkdir(parents=True, exist_ok=True)
@@ -171,6 +175,25 @@ class SelfTestRunner(QObject):
                 assert hashlib.sha256(self.archive.read_bytes()).hexdigest() == self.source_hash
                 assert list(self.directory.iterdir()) == [self.archive]
                 self.checks.append("source_unchanged_no_image_extraction")
+                self.window.set_reading(double=True, rtl=True)
+            elif self.phase == 8:
+                assert self.window.counter.text() == "2–3 / 4"
+                assert viewer._group is not None
+                self.checks.append("double_page_rtl")
+                self.window.thumbnail_dock.show()
+            elif self.phase == 9:
+                if not len(self.window.thumbnails.catalog.cache):
+                    return
+                self.checks.append("lazy_thumbnail_sidebar")
+                gif = animated_gif()
+                viewer.set_pages((PageMedia(0, decode_image(gif), gif),))
+                self.gif_color = viewer._item.pixmap().toImage().pixelColor(0, 0)
+            else:
+                if viewer._item.pixmap().toImage().pixelColor(0, 0) == self.gif_color:
+                    return
+                viewer.clear_image()
+                assert not viewer._movies
+                self.checks.append("animated_gif_playback_cleanup")
                 self._finish()
             self.phase += 1
         except Exception as exc:

@@ -57,7 +57,7 @@ def test_registry_selection_and_availability():
     for path in ("book.zip", "book.CBZ", "book.ZiP"):
         assert isinstance(DEFAULT_REGISTRY.create(path), ZipArchiveProvider)
     assert DEFAULT_REGISTRY.create("a.zip") is not DEFAULT_REGISTRY.create("a.zip")
-    for path in ("book.7z", "book.rar", "book.cbr", "book.txt"):
+    for path in ("book.txt",):
         with pytest.raises(UnsupportedArchiveError):
             DEFAULT_REGISTRY.create(path)
     registry = registry_for(FakeProvider)
@@ -268,3 +268,34 @@ def test_ui_uses_injected_registry(qapp):
         assert window._drop_path(event).suffix == ".test"
     finally:
         window.close()
+
+
+def test_cancel_closes_idle_backend_credentials(image_bytes, wait_until):
+    payload = image_bytes()
+    closed = Event()
+
+    class Reader(FakeProvider):
+        def read_entry(self, entry):
+            return payload
+
+        def close(self):
+            super().close()
+            closed.set()
+
+    worker = ImageWorker(registry=registry_for(Reader))
+    results = []
+    worker.result_ready.connect(results.append)
+    worker.start()
+    credentials = ArchiveCredentials(b"transient")
+    try:
+        worker.submit(LoadRequest(1, 1, Path("a.test"), 0, credentials))
+        wait_until(lambda: bool(results))
+        worker.cancel_session()
+        wait_until(closed.is_set)
+        assert credentials.password_bytes() is None
+        worker.submit(LoadRequest(2, 1, Path("a.test"), 0))
+        wait_until(lambda: len(results) == 2)
+        assert results[-1].error_type is None
+    finally:
+        worker.stop()
+        assert worker.wait(5000)

@@ -10,10 +10,12 @@ from archivelens.archive.base import ArchiveEntry, ArchiveProvider
 from archivelens.archive.catalog import image_entries
 from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
-from archivelens.config import PREFETCH_OFFSETS
-from archivelens.errors import ArchiveLensError, EmptyArchiveError
+from archivelens.config import MAX_ANIMATION_BYTES, PREFETCH_OFFSETS
+from archivelens.errors import ArchiveLensError, EmptyArchiveError, ResourceLimitError
 from archivelens.image.cache import ImageCache
 from archivelens.image.loader import decode_image
+from archivelens.image.media import PageMedia
+from archivelens.image.reading import spread_indices
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,9 @@ class LoadRequest:
     path: Path
     index: int
     credentials: ArchiveCredentials | None = field(default=None, repr=False, compare=False)
+    double_page: bool = False
+    cover: bool = True
+    thumbnail: bool = False
 
 
 @dataclass(frozen=True)
@@ -35,6 +40,7 @@ class LoadResult:
     image: QImage | None = None
     error: str = ""
     error_type: type[ArchiveLensError] | None = None
+    pages: tuple[PageMedia, ...] = ()
 
 
 class ImageWorker(QThread):
@@ -48,6 +54,7 @@ class ImageWorker(QThread):
         self._condition = Condition()
         self._pending: tuple[LoadRequest, int] | None = None
         self._stopping = False
+        self._reset_pending = False
         self._credentials: ArchiveCredentials | None = None
         self._credential_key: tuple[int, Path] | None = None
         self._credential_revision = 0
@@ -74,6 +81,22 @@ class ImageWorker(QThread):
             )
             self._condition.notify()
 
+    def credential_snapshot(self):
+        with self._condition:
+            password = self._credentials.password_bytes() if self._credentials else None
+            return self._credential_revision, ArchiveCredentials(password)
+
+    def cancel_session(self):
+        with self._condition:
+            self._pending = None
+            self._credential_revision += 1
+            self._credential_key = None
+            self._reset_pending = True
+            self._condition.notify()
+            if self._credentials:
+                self._credentials.clear()
+            self._credentials = None
+
     def stop(self) -> None:
         with self._condition:
             self._stopping = True
@@ -92,14 +115,28 @@ class ImageWorker(QThread):
         try:
             while True:
                 with self._condition:
-                    self._condition.wait_for(lambda: self._stopping or self._pending is not None)
+                    self._condition.wait_for(
+                        lambda: self._stopping or self._pending is not None or self._reset_pending
+                    )
                     if self._stopping:
                         return
                     pending = self._pending
                     self._pending = None
+                    reset = self._reset_pending
+                    self._reset_pending = False
+                if reset:
+                    cache.clear()
+                    entries = ()
+                    revision = -1
+                    if provider is not None:
+                        self._close_provider(provider)
+                        provider = None
+                if pending is None:
+                    continue
                 assert pending is not None
                 request, request_revision = pending
                 image = None
+                pages = []
                 error = ""
                 error_type = None
                 index = request.index
@@ -118,12 +155,32 @@ class ImageWorker(QThread):
                     assert provider is not None
                     if not entries:
                         raise EmptyArchiveError()
-                    index = max(0, min(index, len(entries) - 1))
-                    cache.retain([index, *(index + offset for offset in PREFETCH_OFFSETS)])
-                    image = cache.get(index)
-                    if image is None:
-                        image = decode_image(provider.read_entry(entries[index]))
-                        cache.put(index, image)
+                    indices = spread_indices(
+                        index, len(entries), request.double_page, request.cover
+                    )
+                    index = indices[0]
+                    cache.retain([*indices, *(index + offset for offset in PREFETCH_OFFSETS)])
+                    for page_index in indices:
+                        image = cache.get(page_index)
+                        animation = b""
+                        if image is None or entries[page_index].extension == ".gif":
+                            data = provider.read_entry(entries[page_index])
+                            if not request.thumbnail and data.startswith((b"GIF87a", b"GIF89a")):
+                                if len(data) > MAX_ANIMATION_BYTES:
+                                    raise ResourceLimitError()
+                                animation = data
+                            if request.thumbnail:
+                                from archivelens.config import THUMBNAIL_SIZE
+
+                                image = decode_image(data, THUMBNAIL_SIZE)
+                            else:
+                                image = decode_image(data)
+                            if not request.thumbnail:
+                                cache.put(page_index, image)
+                        pages.append(PageMedia(page_index, image, animation))
+                        data = b""
+                        animation = b""
+                    image = pages[0].image
                 except ArchiveLensError as exc:
                     error_type = type(exc)
                     error = error_type.default_message
@@ -132,19 +189,26 @@ class ImageWorker(QThread):
                     error_type = ArchiveLensError
                     error = ArchiveLensError.default_message
                     logger.error("Unexpected image load failure")
+                data = b""
+                animation = b""
                 if error and revision == -1 and provider is not None:
                     self._close_provider(provider)
                     provider = None
                 with self._condition:
                     if self._stopping:
                         return
-                    stale = self._pending is not None
+                    stale = (
+                        self._pending is not None or request_revision != self._credential_revision
+                    )
                 if not stale:
                     self.result_ready.emit(
-                        LoadResult(request.token, entries, index, image, error, error_type)
+                        LoadResult(
+                            request.token, entries, index, image, error, error_type, tuple(pages)
+                        )
                     )
                 image = None
-                if not stale and not error:
+                pages = []
+                if not stale and not error and not request.thumbnail:
                     assert provider is not None
                     self._prefetch(provider, entries, index, cache)
         finally:
@@ -174,7 +238,7 @@ class ImageWorker(QThread):
             return
         for offset in PREFETCH_OFFSETS:
             with self._condition:
-                if self._stopping or self._pending is not None:
+                if self._stopping or self._pending is not None or self._reset_pending:
                     return
             neighbor = index + offset
             if neighbor < 0 or neighbor >= len(entries) or cache.get(neighbor) is not None:

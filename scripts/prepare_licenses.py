@@ -75,6 +75,12 @@ def main() -> int:
         url = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.6.4/LICENSE.txt"
         with urllib.request.urlopen(url, timeout=60) as response:
             openssl_license.write_bytes(response.read())
+    inno_license = destination / "Inno-Setup-LICENSE.txt"
+    if not inno_license.exists():
+        with urllib.request.urlopen(
+            "https://raw.githubusercontent.com/jrsoftware/issrc/is-6_7_3/license.txt", timeout=30
+        ) as response:
+            inno_license.write_bytes(response.read())
     python_license = Path(sys.base_prefix) / "LICENSE.txt"
     if not python_license.is_file():
         raise RuntimeError("Python's bundled LICENSE.txt is missing")
@@ -87,6 +93,66 @@ def main() -> int:
                 target = destination / "PyInstaller" / item.name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, target)
+    backend_names = [
+        "pyzipper",
+        "pycryptodomex",
+        "py7zr",
+        "backports.zstd",
+        "brotli",
+        "inflate64",
+        "multivolumefile",
+        "psutil",
+        "pybcj",
+        "pyppmd",
+        "texttable",
+    ]
+    backend_records = []
+    for name in backend_names:
+        dependency = importlib.metadata.distribution(name)
+        count = 0
+        for item in dependency.files or []:
+            if any(word in item.name.casefold() for word in ("license", "copying", "copyright")):
+                source = dependency.locate_file(item)
+                if source.is_file():
+                    target = destination / name / item.name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, target)
+                    count += 1
+        if not count:
+            raise RuntimeError(f"Missing installed license for {name}")
+        with urllib.request.urlopen(
+            f"https://pypi.org/pypi/{name}/{dependency.version}/json", timeout=30
+        ) as response:
+            package = json.load(response)
+        source = next(item for item in package["urls"] if item["packagetype"] == "sdist")
+        archive = root / "build/upstream-sources" / source["filename"]
+        if not archive.exists():
+            with (
+                urllib.request.urlopen(source["url"], timeout=60) as response,
+                archive.open("wb") as output,
+            ):
+                shutil.copyfileobj(response, output)
+        with archive.open("rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        if digest != source["digests"]["sha256"]:
+            raise RuntimeError(f"Source checksum mismatch for {name}")
+        records.append(
+            {
+                "component": name,
+                "version": dependency.version,
+                "source_url": source["url"],
+                "source_archive": archive.name,
+                "sha256": digest,
+                "license_files": count,
+            }
+        )
+        backend_records.append(
+            {"name": name, "version": dependency.version, "license_files": count}
+        )
+    shutil.copy2(root / "outputs/backends/UNRAR-LICENSE.txt", destination / "UNRAR-LICENSE.txt")
+    (destination / "archive-backends.json").write_text(
+        json.dumps(backend_records, indent=2) + "\n", encoding="utf-8"
+    )
     (destination / "upstream-sources.json").write_text(
         json.dumps(records, indent=2) + "\n", encoding="utf-8"
     )
