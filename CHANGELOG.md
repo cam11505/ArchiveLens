@@ -1,0 +1,14 @@
+# Changelog
+
+## 1.0.0 — 2026-09-14
+
+- Read ZIP/CBZ images on demand without modifying or extracting the photo archive.
+- Natural folder/filename ordering, Unicode paths and duplicate-member handling.
+- JPG/JPEG/PNG/WebP/BMP/GIF-first-frame decoding with EXIF orientation.
+- Open dialog, drag/drop, keyboard navigation and image/archive status.
+- Fit, physical-pixel 100%, zoom, wheel scrolling, drag panning, rotation and fullscreen.
+- Single-worker background loading, latest-request validation, bounded LRU cache and prefetch.
+- Entry/image resource guards, recoverable errors and bounded local diagnostic logging.
+- Windows x64 portable packaging, built-in end-to-end diagnostics, file manifests,
+  SHA-256 verification, third-party licenses and upstream source archives.
+- Windows and Linux test automation; Windows packaged-application validation.

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+dist/
+build/
+*.spec
+!scripts/ArchiveLens.spec
+.idea/
+.vscode/
+*.log
+outputs/
+ArchiveLens Codex 專案開發提示詞.md
