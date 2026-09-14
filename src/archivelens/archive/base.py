@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
+from archivelens.archive.capabilities import ArchiveCapabilities
+from archivelens.archive.credentials import ArchiveCredentials
+
 
 @dataclass(frozen=True, slots=True)
 class ArchiveEntry:
@@ -18,12 +21,14 @@ class ArchiveEntry:
 class ArchiveProvider(ABC):
     """Read-only provider; entries are valid only within their open session."""
 
+    capabilities: ArchiveCapabilities
+
     @staticmethod
     @abstractmethod
     def supports(path: str | Path) -> bool: ...
 
     @abstractmethod
-    def open(self, path: str | Path) -> None: ...
+    def open(self, path: str | Path, *, credentials: ArchiveCredentials | None = None) -> None: ...
 
     @abstractmethod
     def close(self) -> None: ...

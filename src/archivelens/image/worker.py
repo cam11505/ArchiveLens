@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from threading import Condition
 
@@ -8,9 +8,10 @@ from PySide6.QtGui import QImage
 
 from archivelens.archive.base import ArchiveEntry, ArchiveProvider
 from archivelens.archive.catalog import image_entries
-from archivelens.archive.zip_provider import ZipArchiveProvider
+from archivelens.archive.credentials import ArchiveCredentials
+from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
 from archivelens.config import PREFETCH_OFFSETS
-from archivelens.errors import ArchiveLensError
+from archivelens.errors import ArchiveLensError, EmptyArchiveError
 from archivelens.image.cache import ImageCache
 from archivelens.image.loader import decode_image
 
@@ -23,6 +24,7 @@ class LoadRequest:
     generation: int
     path: Path
     index: int
+    credentials: ArchiveCredentials | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,7 @@ class LoadResult:
     index: int
     image: QImage | None = None
     error: str = ""
+    error_type: type[ArchiveLensError] | None = None
 
 
 class ImageWorker(QThread):
@@ -39,28 +42,52 @@ class ImageWorker(QThread):
 
     result_ready = Signal(object)
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, *, registry: ArchiveProviderRegistry | None = None) -> None:
         super().__init__(parent)
+        self.registry = DEFAULT_REGISTRY if registry is None else registry
         self._condition = Condition()
-        self._pending: LoadRequest | None = None
+        self._pending: tuple[LoadRequest, int] | None = None
         self._stopping = False
+        self._credentials: ArchiveCredentials | None = None
+        self._credential_key: tuple[int, Path] | None = None
+        self._credential_revision = 0
 
     def submit(self, request: LoadRequest) -> None:
+        """Transfer credential ownership to this worker until replacement or stop."""
         with self._condition:
-            if not self._stopping:
-                self._pending = request
-                self._condition.notify()
+            if self._stopping:
+                if request.credentials is not None:
+                    request.credentials.clear()
+                return
+            key = (request.generation, request.path)
+            if key != self._credential_key or (
+                request.credentials is not None and request.credentials is not self._credentials
+            ):
+                if self._credentials is not None:
+                    self._credentials.clear()
+                self._credentials = request.credentials or ArchiveCredentials()
+                self._credential_key = key
+                self._credential_revision += 1
+            self._pending = (
+                replace(request, credentials=self._credentials),
+                self._credential_revision,
+            )
+            self._condition.notify()
 
     def stop(self) -> None:
         with self._condition:
             self._stopping = True
             self._pending = None
+            if self._credentials is not None:
+                self._credentials.clear()
+            self._credentials = None
+            self._credential_key = None
             self._condition.notify()
 
     def run(self) -> None:
-        provider: ArchiveProvider = ZipArchiveProvider()
+        provider: ArchiveProvider | None = None
         cache = ImageCache()
-        generation = -1
+        revision = -1
         entries: tuple[ArchiveEntry, ...] = ()
         try:
             while True:
@@ -68,22 +95,29 @@ class ImageWorker(QThread):
                     self._condition.wait_for(lambda: self._stopping or self._pending is not None)
                     if self._stopping:
                         return
-                    request = self._pending
+                    pending = self._pending
                     self._pending = None
-                assert request is not None
+                assert pending is not None
+                request, request_revision = pending
                 image = None
                 error = ""
+                error_type = None
                 index = request.index
                 try:
-                    if request.generation != generation:
+                    if request_revision != revision:
                         cache.clear()
                         entries = ()
-                        generation = -1
-                        provider.open(request.path)
+                        revision = -1
+                        if provider is not None:
+                            self._close_provider(provider)
+                        provider = None
+                        provider = self.registry.create(request.path)
+                        provider.open(request.path, credentials=request.credentials)
                         entries = tuple(image_entries(provider))
-                        generation = request.generation
+                        revision = request_revision
+                    assert provider is not None
                     if not entries:
-                        raise ArchiveLensError("此壓縮檔中沒有找到可顯示的圖片。")
+                        raise EmptyArchiveError()
                     index = max(0, min(index, len(entries) - 1))
                     cache.retain([index, *(index + offset for offset in PREFETCH_OFFSETS)])
                     image = cache.get(index)
@@ -91,23 +125,43 @@ class ImageWorker(QThread):
                         image = decode_image(provider.read_entry(entries[index]))
                         cache.put(index, image)
                 except ArchiveLensError as exc:
-                    error = str(exc)
-                    logger.info("Archive load failed: %s", request.path, exc_info=True)
+                    error_type = type(exc)
+                    error = error_type.default_message
+                    logger.info("Archive load failed (%s)", error_type.__name__)
                 except Exception:
-                    logger.exception("Unexpected image load failure: %s", request.path)
-                    error = "載入失敗，請嘗試其他圖片或重新開啟壓縮檔。"
+                    error_type = ArchiveLensError
+                    error = ArchiveLensError.default_message
+                    logger.error("Unexpected image load failure")
+                if error and revision == -1 and provider is not None:
+                    self._close_provider(provider)
+                    provider = None
                 with self._condition:
                     if self._stopping:
                         return
                     stale = self._pending is not None
                 if not stale:
-                    self.result_ready.emit(LoadResult(request.token, entries, index, image, error))
+                    self.result_ready.emit(
+                        LoadResult(request.token, entries, index, image, error, error_type)
+                    )
                 image = None
                 if not stale and not error:
+                    assert provider is not None
                     self._prefetch(provider, entries, index, cache)
         finally:
             cache.clear()
+            try:
+                if provider is not None:
+                    self._close_provider(provider)
+            finally:
+                self.stop()
+
+    @staticmethod
+    def _close_provider(provider: ArchiveProvider) -> None:
+        try:
             provider.close()
+        except Exception:
+            # Backend exceptions may contain credentials, including during cleanup.
+            logger.error("Archive provider cleanup failed")
 
     def _prefetch(
         self,
@@ -116,6 +170,8 @@ class ImageWorker(QThread):
         index: int,
         cache: ImageCache,
     ) -> None:
+        if not provider.capabilities.allows_prefetch:
+            return
         for offset in PREFETCH_OFFSETS:
             with self._condition:
                 if self._stopping or self._pending is not None:
@@ -130,6 +186,6 @@ class ImageWorker(QThread):
                     cache.put(neighbor, image)
                 image = None
             except ArchiveLensError:
-                logger.debug("Skipped unavailable prefetch: %s", entries[neighbor].path)
+                logger.debug("Skipped unavailable prefetch")
             except Exception:
-                logger.exception("Unexpected prefetch failure")
+                logger.error("Unexpected prefetch failure")

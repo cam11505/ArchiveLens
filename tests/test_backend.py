@@ -8,7 +8,14 @@ import pytest
 from archivelens import config
 from archivelens.archive.catalog import image_entries
 from archivelens.archive.zip_provider import ZipArchiveProvider
-from archivelens.errors import ArchiveLensError
+from archivelens.errors import (
+    ArchiveAccessError,
+    ArchiveLensError,
+    CorruptedArchiveError,
+    ResourceLimitError,
+    UnsupportedArchiveError,
+    UnsupportedEncryptionError,
+)
 from archivelens.utils.file_types import is_image
 from archivelens.utils.natural_sort import natural_sort_key
 
@@ -100,8 +107,12 @@ def test_invalid_and_missing_archives(tmp_path):
     path = tmp_path / "bad.zip"
     path.write_bytes(b"not a zip")
     provider = ZipArchiveProvider()
-    for invalid in [path, tmp_path / "missing.zip", tmp_path / "a.rar"]:
-        with pytest.raises(ArchiveLensError):
+    for invalid, error in [
+        (path, CorruptedArchiveError),
+        (tmp_path / "missing.zip", ArchiveAccessError),
+        (tmp_path / "a.rar", UnsupportedArchiveError),
+    ]:
+        with pytest.raises(error):
             provider.open(invalid)
     with pytest.raises(ArchiveLensError, match="尚未"):
         provider.list_entries()
@@ -120,7 +131,7 @@ def test_unsafe_entry_rejected_before_read(tmp_path, monkeypatch, setting, value
         provider.open(path)
         monkeypatch.setattr(config, setting, value)
         monkeypatch.setattr(ZipFile, "open", lambda *a, **k: pytest.fail("unsafe read"))
-        with pytest.raises(ArchiveLensError, match="大小異常"):
+        with pytest.raises(ResourceLimitError, match="大小異常"):
             provider.read_entry(provider.list_entries()[0])
 
 
@@ -134,5 +145,5 @@ def test_encrypted_entry(tmp_path):
     path.write_bytes(data)
     with ZipArchiveProvider() as provider:
         provider.open(path)
-        with pytest.raises(ArchiveLensError, match="加密"):
+        with pytest.raises(UnsupportedEncryptionError, match="加密"):
             provider.read_entry(provider.list_entries()[0])

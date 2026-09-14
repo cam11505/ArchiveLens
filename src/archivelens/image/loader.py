@@ -2,7 +2,7 @@ from PySide6.QtCore import QBuffer, QByteArray, QIODevice
 from PySide6.QtGui import QImage, QImageReader
 
 from archivelens import config
-from archivelens.errors import ArchiveLensError
+from archivelens.errors import ImageDecodeError, ImageSizeError
 
 
 def decode_image(data: bytes) -> QImage:
@@ -15,12 +15,12 @@ def decode_image(data: bytes) -> QImage:
     reader.setAutoTransform(True)
     size = reader.size()
     if not size.isValid() or size.isEmpty():
-        raise ArchiveLensError("無法辨識圖片尺寸，圖片可能損壞或格式不受支援。")
+        raise ImageDecodeError()
     if size.width() * size.height() > config.MAX_IMAGE_PIXELS:
-        raise ArchiveLensError("圖片尺寸過大，基於安全考量未載入。")
+        raise ImageSizeError()
     image = reader.read()
     if image.isNull():
-        raise ArchiveLensError("圖片解碼失敗，檔案可能損壞或超過記憶體限制。")
+        raise ImageDecodeError()
     if image.width() * image.height() > config.MAX_IMAGE_PIXELS:
-        raise ArchiveLensError("圖片尺寸過大，基於安全考量未載入。")
+        raise ImageSizeError()
     return image

@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from archivelens.archive.catalog import image_entries
-from archivelens.archive.zip_provider import ZipArchiveProvider
+from archivelens.archive.factory import DEFAULT_REGISTRY
 from archivelens.errors import ArchiveLensError
 
 
@@ -11,7 +11,7 @@ def main() -> int:
     parser.add_argument("archive")
     args = parser.parse_args()
     try:
-        with ZipArchiveProvider() as provider:
+        with DEFAULT_REGISTRY.create(args.archive) as provider:
             provider.open(args.archive)
             entries = image_entries(provider)
             for entry in entries:
@@ -19,7 +19,7 @@ def main() -> int:
             if not entries:
                 print("此壓縮檔中沒有找到可顯示的圖片。", file=sys.stderr)
     except ArchiveLensError as exc:
-        print(str(exc), file=sys.stderr)
+        print(type(exc).default_message, file=sys.stderr)
         return 1
     return 0
 

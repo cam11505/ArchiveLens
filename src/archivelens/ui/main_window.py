@@ -16,17 +16,18 @@ from PySide6.QtWidgets import (
 
 from archivelens import __version__
 from archivelens.archive.base import ArchiveEntry
+from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
 from archivelens.image.worker import ImageWorker, LoadRequest, LoadResult
 from archivelens.ui.image_viewer import ImageViewer
 from archivelens.ui.toolbar import make_action, make_toolbar
-from archivelens.utils.file_types import ARCHIVE_EXTENSIONS
 
 
 class MainWindow(QMainWindow):
     """Open archives, navigate images and present only the latest load result."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, registry: ArchiveProviderRegistry | None = None) -> None:
         super().__init__()
+        self.registry = DEFAULT_REGISTRY if registry is None else registry
         self.setWindowTitle("ArchiveLens")
         self.resize(1100, 780)
         self.setWindowIcon(
@@ -43,7 +44,7 @@ class MainWindow(QMainWindow):
         self._normal_state = Qt.WindowState.WindowNoState
         self._dialogs: list[QMessageBox] = []
         self.viewer = ImageViewer(self)
-        self.message = QLabel("拖曳 ZIP / CBZ 到這裡")
+        self.message = QLabel(f"拖曳 {self.registry.format_label()} 到這裡")
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setWordWrap(True)
         self.message.setStyleSheet("font-size: 22px; padding: 24px;")
@@ -117,7 +118,7 @@ class MainWindow(QMainWindow):
         self.counter = QLabel("0 / 0")
         self.statusBar().addPermanentWidget(self.counter)
         self.viewer.zoom_changed.connect(self._show_zoom)
-        self.worker = ImageWorker(self)
+        self.worker = ImageWorker(self, registry=self.registry)
         self.worker.result_ready.connect(self._on_result)
         self.worker.finished.connect(self._on_worker_finished)
         self.worker.start()
@@ -126,7 +127,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def choose_archive(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "開啟壓縮檔", "", "圖片壓縮檔 (*.zip *.cbz *.ZIP *.CBZ)"
+            self, "開啟壓縮檔", "", self.registry.file_dialog_filter()
         )
         if path:
             self.open_archive(path)
@@ -247,7 +248,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "操作說明",
-            "Ctrl+O：開啟 ZIP / CBZ\n"
+            f"Ctrl+O：開啟 {self.registry.format_label()}\n"
             "← / →、PageUp / PageDown：上一張 / 下一張\n"
             "Backspace / Space：上一張 / 下一張\nHome / End：第一張 / 最後一張\n"
             "+ / = / -：縮放　0：符合視窗　1：100%\n"
@@ -262,17 +263,16 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "關於 ArchiveLens",
-            f"ArchiveLens {__version__}\n直接瀏覽 ZIP / CBZ 內的圖片。\n\n"
+            f"ArchiveLens {__version__}\n直接瀏覽 {self.registry.format_label()} 內的圖片。\n\n"
             "本機操作、唯讀、無遙測。\nMIT License · PySide6 / Qt\n"
             "第三方元件授權請參閱隨附 THIRD_PARTY_NOTICES.md。",
         )
 
-    @staticmethod
-    def _drop_path(event: QDragEnterEvent | QDropEvent) -> Path | None:
+    def _drop_path(self, event: QDragEnterEvent | QDropEvent) -> Path | None:
         urls = event.mimeData().urls()
         if len(urls) == 1 and urls[0].isLocalFile():
             path = Path(urls[0].toLocalFile())
-            if path.suffix.casefold() in ARCHIVE_EXTENSIONS:
+            if self.registry.supports(path):
                 return path
         return None
 

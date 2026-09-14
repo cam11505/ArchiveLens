@@ -5,14 +5,14 @@ from archivelens.image.worker import ImageWorker, LoadRequest
 
 
 def test_prefetch_window_and_cache_hits(tmp_path, image_bytes, qapp, wait_until, monkeypatch):
-    import archivelens.image.worker as module
+    from archivelens.archive.zip_provider import ZipArchiveProvider
 
     archive = tmp_path / "many.zip"
     with ZipFile(archive, "w") as target:
         for i in range(12):
             target.writestr(f"{i}.png", image_bytes())
     reads = []
-    original = module.ZipArchiveProvider.read_entry
+    original = ZipArchiveProvider.read_entry
     prefetched = Event()
     original_prefetch = ImageWorker._prefetch
 
@@ -24,7 +24,7 @@ def test_prefetch_window_and_cache_hits(tmp_path, image_bytes, qapp, wait_until,
         original_prefetch(*args)
         prefetched.set()
 
-    monkeypatch.setattr(module.ZipArchiveProvider, "read_entry", read)
+    monkeypatch.setattr(ZipArchiveProvider, "read_entry", read)
     monkeypatch.setattr(ImageWorker, "_prefetch", prefetch)
     results = []
     worker = ImageWorker()
@@ -53,7 +53,7 @@ def test_prefetch_window_and_cache_hits(tmp_path, image_bytes, qapp, wait_until,
 def test_pending_navigation_takes_priority_over_prefetch(
     tmp_path, image_bytes, wait_until, monkeypatch
 ):
-    import archivelens.image.worker as module
+    from archivelens.archive.zip_provider import ZipArchiveProvider
 
     archive = tmp_path / "priority.zip"
     with ZipFile(archive, "w") as target:
@@ -61,7 +61,7 @@ def test_pending_navigation_takes_priority_over_prefetch(
             target.writestr(f"{i}.png", image_bytes())
     entered, release = Event(), Event()
     reads = []
-    original = module.ZipArchiveProvider.read_entry
+    original = ZipArchiveProvider.read_entry
 
     def read(provider, entry):
         reads.append(entry.index)
@@ -70,7 +70,7 @@ def test_pending_navigation_takes_priority_over_prefetch(
             assert release.wait(5)
         return original(provider, entry)
 
-    monkeypatch.setattr(module.ZipArchiveProvider, "read_entry", read)
+    monkeypatch.setattr(ZipArchiveProvider, "read_entry", read)
     results = []
     worker = ImageWorker()
     worker.result_ready.connect(results.append)

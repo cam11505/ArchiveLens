@@ -142,7 +142,8 @@ the source tests. Only Windows x64 is distributed as a portable binary in v1.0.
 
 ## Architecture
 
-- `archive/`: read-only provider interface, ZIP/CBZ provider and sorted image catalog.
+- `archive/`: read-only provider registry, capabilities, ephemeral credentials, ZIP/CBZ provider
+  and sorted image catalog. See [provider development](docs/PROVIDERS.md).
 - `image/`: in-memory Qt image decoding.
 - `ui/`: main window and image viewer.
 - `utils/`: natural ordering and file extension filtering.
