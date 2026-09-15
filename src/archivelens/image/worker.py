@@ -6,11 +6,16 @@ from threading import Condition
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QImage
 
-from archivelens.archive.base import ArchiveEntry, ArchiveProvider
-from archivelens.archive.catalog import image_entries
 from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
-from archivelens.config import MAX_ANIMATION_BYTES, PREFETCH_OFFSETS
+from archivelens.config import MAX_ANIMATION_BYTES, PREFETCH_OFFSETS, THUMBNAIL_SIZE
+from archivelens.content.base import (
+    ContentProvider,
+    PageDescriptor,
+    PageLoadRequest,
+    SourceIdentity,
+)
+from archivelens.content.factory import ContentProviderRegistry, create_content_registry
 from archivelens.errors import ArchiveLensError, EmptyArchiveError, ResourceLimitError
 from archivelens.image.cache import ImageCache
 from archivelens.image.loader import decode_image
@@ -35,7 +40,7 @@ class LoadRequest:
 @dataclass(frozen=True)
 class LoadResult:
     token: int
-    entries: tuple[ArchiveEntry, ...]
+    entries: tuple[PageDescriptor, ...]
     index: int
     image: QImage | None = None
     error: str = ""
@@ -43,14 +48,30 @@ class LoadResult:
     pages: tuple[PageMedia, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class PageCacheKey:
+    source: SourceIdentity
+    page: str
+    render_size: tuple[int, int] | None = None
+
+
 class ImageWorker(QThread):
-    """Own archive access in one thread with a single replaceable pending request."""
+    """Own content access in one thread with a single replaceable pending request."""
 
     result_ready = Signal(object)
 
-    def __init__(self, parent=None, *, registry: ArchiveProviderRegistry | None = None) -> None:
+    def __init__(
+        self,
+        parent=None,
+        *,
+        registry: ArchiveProviderRegistry | None = None,
+        content_registry: ContentProviderRegistry | None = None,
+    ) -> None:
         super().__init__(parent)
         self.registry = DEFAULT_REGISTRY if registry is None else registry
+        self.content_registry = (
+            create_content_registry(self.registry) if content_registry is None else content_registry
+        )
         self._condition = Condition()
         self._pending: tuple[LoadRequest, int] | None = None
         self._stopping = False
@@ -108,10 +129,10 @@ class ImageWorker(QThread):
             self._condition.notify()
 
     def run(self) -> None:
-        provider: ArchiveProvider | None = None
+        provider: ContentProvider | None = None
         cache = ImageCache()
         revision = -1
-        entries: tuple[ArchiveEntry, ...] = ()
+        entries: tuple[PageDescriptor, ...] = ()
         try:
             while True:
                 with self._condition:
@@ -148,9 +169,9 @@ class ImageWorker(QThread):
                         if provider is not None:
                             self._close_provider(provider)
                         provider = None
-                        provider = self.registry.create(request.path)
+                        provider = self.content_registry.create(request.path)
                         provider.open(request.path, credentials=request.credentials)
-                        entries = tuple(image_entries(provider))
+                        entries = tuple(provider.list_pages())
                         revision = request_revision
                     assert provider is not None
                     if not entries:
@@ -159,24 +180,40 @@ class ImageWorker(QThread):
                         index, len(entries), request.double_page, request.cover
                     )
                     index = indices[0]
-                    cache.retain([*indices, *(index + offset for offset in PREFETCH_OFFSETS)])
+                    source_identity = provider.source_identity
+                    retained_indices = [
+                        *indices,
+                        *(index + offset for offset in PREFETCH_OFFSETS),
+                    ]
+                    cache.retain(
+                        PageCacheKey(source_identity, entries[item].cache_id)
+                        for item in retained_indices
+                        if 0 <= item < len(entries)
+                    )
                     for page_index in indices:
-                        image = cache.get(page_index)
+                        cache_key = PageCacheKey(source_identity, entries[page_index].cache_id)
+                        image = cache.get(cache_key)
                         animation = b""
                         if image is None or entries[page_index].extension == ".gif":
-                            data = provider.read_entry(entries[page_index])
-                            if not request.thumbnail and data.startswith((b"GIF87a", b"GIF89a")):
+                            page_request = PageLoadRequest(
+                                thumbnail_size=THUMBNAIL_SIZE if request.thumbnail else None
+                            )
+                            content = provider.load_page(entries[page_index], page_request)
+                            data = content.encoded or b""
+                            if content.image is not None:
+                                image = content.image
+                            elif not request.thumbnail and data.startswith((b"GIF87a", b"GIF89a")):
                                 if len(data) > MAX_ANIMATION_BYTES:
                                     raise ResourceLimitError()
                                 animation = data
-                            if request.thumbnail:
-                                from archivelens.config import THUMBNAIL_SIZE
-
-                                image = decode_image(data, THUMBNAIL_SIZE)
-                            else:
-                                image = decode_image(data)
+                            if content.image is None:
+                                image = (
+                                    decode_image(data, page_request.thumbnail_size)
+                                    if request.thumbnail
+                                    else decode_image(data)
+                                )
                             if not request.thumbnail:
-                                cache.put(page_index, image)
+                                cache.put(cache_key, image)
                         pages.append(PageMedia(page_index, image, animation))
                         data = b""
                         animation = b""
@@ -220,7 +257,7 @@ class ImageWorker(QThread):
                 self.stop()
 
     @staticmethod
-    def _close_provider(provider: ArchiveProvider) -> None:
+    def _close_provider(provider: ContentProvider) -> None:
         try:
             provider.close()
         except Exception:
@@ -229,25 +266,34 @@ class ImageWorker(QThread):
 
     def _prefetch(
         self,
-        provider: ArchiveProvider,
-        entries: tuple[ArchiveEntry, ...],
+        provider: ContentProvider,
+        entries: tuple[PageDescriptor, ...],
         index: int,
         cache: ImageCache,
     ) -> None:
         if not provider.capabilities.allows_prefetch:
             return
+        source_identity = provider.source_identity
         for offset in PREFETCH_OFFSETS:
             with self._condition:
                 if self._stopping or self._pending is not None or self._reset_pending:
                     return
             neighbor = index + offset
-            if neighbor < 0 or neighbor >= len(entries) or cache.get(neighbor) is not None:
+            if neighbor < 0 or neighbor >= len(entries):
+                continue
+            cache_key = PageCacheKey(source_identity, entries[neighbor].cache_id)
+            if cache.get(cache_key) is not None:
                 continue
             try:
-                image = decode_image(provider.read_entry(entries[neighbor]))
+                content = provider.load_page(entries[neighbor], PageLoadRequest())
+                image = (
+                    content.image
+                    if content.image is not None
+                    else decode_image(content.encoded or b"")
+                )
                 # Prefetch must not evict the requested image to store a speculative neighbor.
                 if image.sizeInBytes() <= cache.max_bytes - cache.current_bytes:
-                    cache.put(neighbor, image)
+                    cache.put(cache_key, image)
                 image = None
             except ArchiveLensError:
                 logger.debug("Skipped unavailable prefetch")

@@ -16,9 +16,10 @@ from PySide6.QtWidgets import (
 )
 
 from archivelens import __version__
-from archivelens.archive.base import ArchiveEntry
 from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
+from archivelens.content.base import PageDescriptor
+from archivelens.content.factory import create_content_registry
 from archivelens.errors import BadPasswordError, PasswordRequiredError
 from archivelens.image.reading import spread_indices
 from archivelens.image.worker import ImageWorker, LoadRequest, LoadResult
@@ -30,21 +31,22 @@ from archivelens.ui.toolbar import make_action, make_toolbar
 
 
 class MainWindow(QMainWindow):
-    """Open archives, navigate images and present only the latest load result."""
+    """Open content sources, navigate pages and present only the latest load result."""
 
     def __init__(self, *, registry: ArchiveProviderRegistry | None = None, settings=None) -> None:
         super().__init__()
         self.settings = create_settings() if settings is None else settings
         self.registry = DEFAULT_REGISTRY if registry is None else registry
+        self.content_registry = create_content_registry(self.registry)
         self.setWindowTitle("ArchiveLens")
         self.resize(1100, 780)
         self.setWindowIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)
         )
         self.setAcceptDrops(True)
-        self.entries: tuple[ArchiveEntry, ...] = ()
+        self.entries: tuple[PageDescriptor, ...] = ()
         self.current_index = 0
-        self.archive_path: Path | None = None
+        self.source_path: Path | None = None
         self.double_page = read_bool(self.settings, "double_page", False)
         self.rtl = read_bool(self.settings, "rtl", False)
         self.cover = read_bool(self.settings, "cover", True)
@@ -71,7 +73,9 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(welcome)
         self.stack.addWidget(self.viewer)
         self.setCentralWidget(self.stack)
-        self.thumbnails = ThumbnailSidebar(self.registry, self)
+        self.thumbnails = ThumbnailSidebar(
+            self.registry, self, content_registry=self.content_registry
+        )
         self.thumbnails.page_selected.connect(self.go_to)
         self.thumbnail_dock = QDockWidget("縮圖", self)
         self.thumbnail_dock.setObjectName("thumbnail_sidebar")
@@ -170,7 +174,9 @@ class MainWindow(QMainWindow):
         self.counter = QLabel("0 / 0")
         self.statusBar().addPermanentWidget(self.counter)
         self.viewer.zoom_changed.connect(self._show_zoom)
-        self.worker = ImageWorker(self, registry=self.registry)
+        self.worker = ImageWorker(
+            self, registry=self.registry, content_registry=self.content_registry
+        )
         self.worker.result_ready.connect(self._on_result)
         self.worker.finished.connect(self._on_worker_finished)
         self.worker.start()
@@ -194,17 +200,20 @@ class MainWindow(QMainWindow):
             self.open_archive(path)
 
     def open_archive(self, path: str | Path) -> None:
+        self.open_content(path)
+
+    def open_content(self, path: str | Path) -> None:
         if self._closing:
             return
         self.thumbnails.reset_session()
-        self.archive_path = Path(path)
+        self.source_path = Path(path)
         self.entries = ()
         self.current_index = 0
         self.viewer.reset_view_state()
         for dialog in self._dialogs[:]:
             dialog.close()
         self._generation += 1
-        self.setWindowTitle(f"{self.archive_path.name} — ArchiveLens")
+        self.setWindowTitle(f"{self.source_path.name} — ArchiveLens")
         self._request_image()
 
     def set_reading(self, *, double=None, rtl=None):
@@ -242,20 +251,20 @@ class MainWindow(QMainWindow):
             self._request_image()
 
     def _request_image(self, credentials: ArchiveCredentials | None = None) -> None:
-        if self.archive_path is None:
+        if self.source_path is None:
             return
         self._token += 1
         self.loading = True
         self.viewer.clear_image()
         self.message.setText("載入中…")
         self.stack.setCurrentIndex(0)
-        self.statusBar().showMessage(self.archive_path.name)
+        self.statusBar().showMessage(self.source_path.name)
         self._update_navigation()
         self.worker.submit(
             LoadRequest(
                 self._token,
                 self._generation,
-                self.archive_path,
+                self.source_path,
                 self.current_index,
                 credentials,
                 self.double_page,
@@ -273,7 +282,7 @@ class MainWindow(QMainWindow):
         self._update_navigation()
         if self.entries:
             entry = self.entries[self.current_index]
-            self.setWindowTitle(f"{entry.name} — {self.archive_path.name} — ArchiveLens")
+            self.setWindowTitle(f"{entry.name} — {self.source_path.name} — ArchiveLens")
         if result.error_type in (PasswordRequiredError, BadPasswordError):
             self.message.setText(result.error)
             self._ask_password(result.error)
@@ -285,7 +294,7 @@ class MainWindow(QMainWindow):
         elif result.image is not None:
             revision, credentials = self.worker.credential_snapshot()
             self.thumbnails.set_session(
-                self.archive_path, self._generation, self.entries, revision, credentials
+                self.source_path, self._generation, self.entries, revision, credentials
             )
             self.thumbnails.setCurrentIndex(self.thumbnails.catalog.index(self.current_index))
             self.stack.setCurrentIndex(1)
@@ -344,13 +353,18 @@ class MainWindow(QMainWindow):
 
     @Slot(float)
     def _show_zoom(self, factor: float) -> None:
-        if self.entries and self.archive_path:
+        if self.entries and self.source_path:
             entry = self.entries[self.current_index]
             size = self.viewer.image_size
             self.statusBar().showMessage(
                 f"{entry.path}  |  {size.width()} × {size.height()}  |  "
-                f"{entry.extension[1:].upper()} · {entry.uncompressed_size / (1024 * 1024):.1f} MB"
-                f"  |  {factor:.0%}  |  {self.archive_path.name}"
+                f"{entry.extension[1:].upper()}"
+                + (
+                    f" · {entry.size_bytes / (1024 * 1024):.1f} MB"
+                    if entry.size_bytes is not None
+                    else ""
+                )
+                + f"  |  {factor:.0%}  |  {self.source_path.name}"
             )
 
     @Slot()

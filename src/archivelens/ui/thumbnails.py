@@ -39,14 +39,14 @@ class ThumbnailModel(QAbstractListModel):
 class ThumbnailSidebar(QListView):
     page_selected = Signal(int)
 
-    def __init__(self, registry, parent=None):
+    def __init__(self, registry, parent=None, *, content_registry=None):
         super().__init__(parent)
         self.catalog = ThumbnailModel(self)
         self.setModel(self.catalog)
         self.setUniformItemSizes(True)
         self.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
         self.setMinimumWidth(180)
-        self.worker = ImageWorker(self, registry=registry)
+        self.worker = ImageWorker(self, registry=registry, content_registry=content_registry)
         self.worker.result_ready.connect(self._result)
         self.worker.start()
         self.path = None

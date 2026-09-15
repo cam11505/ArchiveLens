@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from collections.abc import Iterable
+from collections.abc import Hashable, Iterable
 
 from PySide6.QtGui import QImage
 
@@ -13,20 +13,20 @@ class ImageCache:
         if max_bytes < 0:
             raise ValueError("Cache budget must not be negative")
         self.max_bytes = max_bytes
-        self._images: OrderedDict[int, QImage] = OrderedDict()
+        self._images: OrderedDict[Hashable, QImage] = OrderedDict()
         self.current_bytes = 0
 
     def __len__(self) -> int:
         return len(self._images)
 
-    def get(self, key: int) -> QImage | None:
+    def get(self, key: Hashable) -> QImage | None:
         image = self._images.get(key)
         if image is None:
             return None
         self._images.move_to_end(key)
         return QImage(image)
 
-    def put(self, key: int, image: QImage) -> bool:
+    def put(self, key: Hashable, image: QImage) -> bool:
         self._remove(key)
         cost = image.sizeInBytes()
         if image.isNull() or cost > self.max_bytes:
@@ -37,13 +37,13 @@ class ImageCache:
         self.current_bytes += cost
         return True
 
-    def retain(self, keys: Iterable[int]) -> None:
+    def retain(self, keys: Iterable[Hashable]) -> None:
         keep = set(keys)
         for key in tuple(self._images):
             if key not in keep:
                 self._remove(key)
 
-    def _remove(self, key: int) -> None:
+    def _remove(self, key: Hashable) -> None:
         image = self._images.pop(key, None)
         if image is not None:
             self.current_bytes -= image.sizeInBytes()

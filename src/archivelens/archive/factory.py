@@ -20,6 +20,10 @@ class ArchiveProviderRegistry:
         self._providers.update(dict.fromkeys(extensions, provider))
 
     @property
+    def registered_extensions(self) -> frozenset[str]:
+        return frozenset(self._providers)
+
+    @property
     def supported_extensions(self) -> frozenset[str]:
         return frozenset(
             ext for ext, provider in self._providers.items() if provider.capabilities.available
