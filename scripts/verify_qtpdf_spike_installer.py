@@ -68,11 +68,18 @@ def main() -> int:
         )
         result = json.loads(report.read_text(encoding="utf-8"))
         required_checks = {
-            "qtpdf_normal_many_large_bounded_render",
-            "qtpdf_password_session_only",
+            "folder_flat_recursive_read_only",
+            "pdf_provider_normal_many_large_bounded_render",
+            "pdf_password_session_and_render_guards",
+            "bounded_auto_manual_trim",
+            "reading_state_v2_no_credentials",
         }
-        if not result["success"] or not required_checks <= set(result["checks"]):
-            raise RuntimeError("Installed QtPdf self-test failed")
+        if (
+            not result["success"]
+            or len(result["checks"]) < 23
+            or not required_checks <= set(result["checks"])
+        ):
+            raise RuntimeError("Installed v1.2 self-test failed")
     finally:
         if installed and uninstall.is_file():
             subprocess.run(
