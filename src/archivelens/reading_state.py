@@ -30,6 +30,8 @@ class ReaderState:
     fit_mode: str = "fit_page"
     zoom_factor: float = 1.0
     rotation: int = 0
+    trim_mode: str = "off"
+    trim_margins: tuple[int, int, int, int] = (0, 0, 0, 0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,7 +170,7 @@ class ReadingStateStore:
                 raise ValueError("reading-state file is too large")
             payload = json.loads(self.path.read_text(encoding="utf-8"))
             version = payload.get("schema_version", payload.get("version"))
-            if version not in (0, READING_STATE_SCHEMA_VERSION):
+            if version not in (0, 1, READING_STATE_SCHEMA_VERSION):
                 raise ValueError("unsupported reading-state schema")
             records = payload.get("records", [])
             if not isinstance(records, list):
@@ -205,6 +207,8 @@ class ReadingStateStore:
             fit_mode=_fit_mode(state_raw.get("fit_mode", "fit_page")),
             zoom_factor=max(MIN_ZOOM, min(float(state_raw.get("zoom_factor", 1.0)), MAX_ZOOM)),
             rotation=int(state_raw.get("rotation", 0)) % 360,
+            trim_mode=_trim_mode(state_raw.get("trim_mode", "off")),
+            trim_margins=_trim_margins(state_raw.get("trim_margins", (0, 0, 0, 0))),
         )
         bookmarks = tuple(
             PageBookmark(
@@ -276,7 +280,21 @@ def _optional_int(value: object) -> int | None:
 
 
 def _fit_mode(value: object) -> str:
-    return str(value) if value in {"fit_page", "actual", "custom"} else "fit_page"
+    return (
+        str(value)
+        if value in {"fit_page", "fit_width", "fit_height", "actual", "custom"}
+        else "fit_page"
+    )
+
+
+def _trim_mode(value: object) -> str:
+    return str(value) if value in {"off", "auto", "manual"} else "off"
+
+
+def _trim_margins(value: object) -> tuple[int, int, int, int]:
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        return (0, 0, 0, 0)
+    return tuple(max(0, min(int(item), 40)) for item in value)
 
 
 def create_reading_state_store(settings: QSettings | None = None) -> ReadingStateStore:

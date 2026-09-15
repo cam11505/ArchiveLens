@@ -31,6 +31,8 @@ def test_state_round_trip_history_bookmarks_and_secret_exclusion(tmp_path):
         fit_mode="custom",
         zoom_factor=1.75,
         rotation=90,
+        trim_mode="manual",
+        trim_margins=(3, 4, 5, 6),
     )
     store.update(identity(), "Book", state)
     assert store.toggle_bookmark(identity(), 7, "Page 8")
@@ -41,6 +43,8 @@ def test_state_round_trip_history_bookmarks_and_secret_exclusion(tmp_path):
     assert restored.state.page_index == 7
     assert restored.state.zoom_factor == 1.75
     assert restored.state.rotation == 90
+    assert restored.state.trim_mode == "manual"
+    assert restored.state.trim_margins == (3, 4, 5, 6)
     assert [item.page_index for item in restored.bookmarks] == [7, 12]
     payload = path.read_text(encoding="utf-8")
     assert "password" not in payload.casefold()
@@ -104,6 +108,14 @@ def test_corrupt_unknown_and_v0_state_fall_back_or_migrate(tmp_path):
     migrated = ReadingStateStore(path)
     assert not migrated.load_error
     assert migrated.recent()[0].state.page_index == 4
+
+    old_payload = json.loads(path.read_text(encoding="utf-8"))
+    old_payload["schema_version"] = 1
+    old_payload.pop("version", None)
+    path.write_text(json.dumps(old_payload), encoding="utf-8")
+    version_one = ReadingStateStore(path)
+    assert not version_one.load_error
+    assert version_one.recent()[0].state.trim_mode == "off"
 
     path.write_text(json.dumps({"schema_version": 999, "records": []}), encoding="utf-8")
     unknown = ReadingStateStore(path)

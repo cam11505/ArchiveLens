@@ -1,27 +1,37 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QActionGroup, QCloseEvent, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QDockWidget,
     QFileDialog,
+    QFormLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QStackedWidget,
     QStyle,
     QVBoxLayout,
     QWidget,
 )
 
-from archivelens import __version__
+from archivelens import __version__, config
 from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
-from archivelens.content.base import PageDescriptor, SourceIdentity, source_identity_for_path
+from archivelens.content.base import (
+    PageDescriptor,
+    SourceIdentity,
+    SourceType,
+    source_identity_for_path,
+)
 from archivelens.content.factory import create_content_registry
 from archivelens.errors import BadPasswordError, PasswordRequiredError
 from archivelens.image.reading import spread_indices
+from archivelens.image.trim import TrimMargins
 from archivelens.image.worker import ImageWorker, LoadRequest, LoadResult
 from archivelens.reading_state import (
     ReaderState,
@@ -71,6 +81,8 @@ class MainWindow(QMainWindow):
         self.view_mode = "fit_page"
         self.page_zoom_factor = 1.0
         self.page_rotation = 0
+        self.trim_mode = "off"
+        self.trim_margins = TrimMargins()
         self._applying_reader_state = False
         self.loading = False
         self._token = 0
@@ -79,6 +91,11 @@ class MainWindow(QMainWindow):
         self._normal_state = Qt.WindowState.WindowNoState
         self._dialogs: list[QMessageBox] = []
         self.viewer = ImageViewer(self)
+        self._pdf_resize_timer = QTimer(self)
+        self._pdf_resize_timer.setSingleShot(True)
+        self._pdf_resize_timer.setInterval(150)
+        self._pdf_resize_timer.timeout.connect(self._rerender_pdf_for_viewport)
+        self.viewer.viewport_changed.connect(self._pdf_resize_timer.start)
         self.message = QLabel(f"拖曳 {self.content_registry.format_label()} 到這裡")
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setWordWrap(True)
@@ -125,6 +142,8 @@ class MainWindow(QMainWindow):
             self, "最後一張", lambda: self.go_to(len(self.entries) - 1), ["End"]
         )
         self.fit_action = make_action(self, "符合視窗", self.fit_current, ["0"])
+        self.fit_width_action = make_action(self, "符合寬度", self.fit_width_current, ["2"])
+        self.fit_height_action = make_action(self, "符合高度", self.fit_height_current, ["3"])
         self.zoom_out_action = make_action(self, "縮小", lambda: self.zoom_current(False), ["-"])
         self.zoom_in_action = make_action(self, "放大", lambda: self.zoom_current(True), ["+", "="])
         self.actual_action = make_action(self, "100%", self.actual_current, ["1"])
@@ -141,6 +160,8 @@ class MainWindow(QMainWindow):
             self.zoom_out_action,
             self.zoom_in_action,
             self.fit_action,
+            self.fit_width_action,
+            self.fit_height_action,
             self.actual_action,
             self.rotate_left_action,
             self.rotate_right_action,
@@ -183,6 +204,34 @@ class MainWindow(QMainWindow):
                 self.fullscreen_action,
             ]
         )
+        fit_group = QActionGroup(self)
+        for action in (
+            self.fit_action,
+            self.fit_width_action,
+            self.fit_height_action,
+            self.actual_action,
+        ):
+            action.setCheckable(True)
+            fit_group.addAction(action)
+        trim_menu = view_menu.addMenu("裁切邊框")
+        self.trim_off_action = make_action(self, "關閉裁切", lambda: self.set_trim_mode("off"), [])
+        self.trim_auto_action = make_action(
+            self, "自動裁切", lambda: self.set_trim_mode("auto"), []
+        )
+        self.trim_manual_action = make_action(
+            self, "手動邊距…", lambda: self.set_trim_mode("manual"), []
+        )
+        trim_group = QActionGroup(self)
+        for action in (self.trim_off_action, self.trim_auto_action, self.trim_manual_action):
+            action.setCheckable(True)
+            trim_group.addAction(action)
+            trim_menu.addAction(action)
+        self._trim_actions = (
+            self.trim_off_action,
+            self.trim_auto_action,
+            self.trim_manual_action,
+        )
+        self._sync_view_actions()
         reading_menu = self.menuBar().addMenu("閱讀")
         self.ltr_action = make_action(self, "由左至右", lambda: self.set_reading(rtl=False), [])
         self.rtl_action = make_action(self, "由右至左", lambda: self.set_reading(rtl=True), [])
@@ -271,7 +320,11 @@ class MainWindow(QMainWindow):
             self.view_mode = "fit_page"
             self.page_zoom_factor = 1.0
             self.page_rotation = 0
+            self.trim_mode = "off"
+            self.trim_margins = TrimMargins()
         self._sync_reading_actions()
+        self._sync_view_actions()
+        self.viewer.set_trim(self.trim_mode, self.trim_margins)
         self.viewer.reset_view_state()
         for dialog in self._dialogs[:]:
             dialog.close()
@@ -334,10 +387,16 @@ class MainWindow(QMainWindow):
         self._update_navigation()
         viewport = self.viewer.viewport().size()
         device_ratio = self.viewer.devicePixelRatioF()
-        render_size = (
-            max(1, round(viewport.width() * device_ratio)),
-            max(1, round(viewport.height() * device_ratio)),
+        width = min(config.MAX_PDF_RENDER_EDGE, max(1, round(viewport.width() * device_ratio)))
+        height = min(
+            config.MAX_PDF_RENDER_EDGE, max(1, round(viewport.height() * device_ratio))
         )
+        if self.view_mode == "fit_width":
+            render_size = (width, config.MAX_PDF_RENDER_EDGE)
+        elif self.view_mode == "fit_height":
+            render_size = (config.MAX_PDF_RENDER_EDGE, height)
+        else:
+            render_size = (width, height)
         self.worker.submit(
             LoadRequest(
                 self._token,
@@ -444,6 +503,8 @@ class MainWindow(QMainWindow):
         self.last_action.setEnabled(has_next)
         for action in self._viewer_actions:
             action.setEnabled(self.viewer._item is not None and not self.loading)
+        for action in self._trim_actions:
+            action.setEnabled(self.viewer._item is not None and not self.loading)
         self.bookmark_action.setEnabled(bool(self.entries) and not self.loading)
         page = self.current_index + 1 if self.entries else 0
         self.counter.setText(
@@ -471,6 +532,12 @@ class MainWindow(QMainWindow):
     def fit_current(self) -> None:
         self.viewer.fit_image()
 
+    def fit_width_current(self) -> None:
+        self.viewer.fit_width()
+
+    def fit_height_current(self) -> None:
+        self.viewer.fit_height()
+
     def actual_current(self) -> None:
         self.viewer.actual_size()
 
@@ -483,7 +550,14 @@ class MainWindow(QMainWindow):
             return
         self.view_mode = mode
         self.page_zoom_factor = factor
+        self._sync_view_actions()
         self._save_reading_state()
+        if (
+            self.source_identity is not None
+            and self.source_identity.source_type is SourceType.PDF
+            and mode.startswith("fit_")
+        ):
+            self._pdf_resize_timer.start(0)
 
     def rotate_current(self, degrees: int) -> None:
         self.page_rotation = (self.page_rotation + degrees) % 360
@@ -495,6 +569,10 @@ class MainWindow(QMainWindow):
         try:
             if self.view_mode == "fit_page":
                 self.viewer.fit_image()
+            elif self.view_mode == "fit_width":
+                self.viewer.fit_width()
+            elif self.view_mode == "fit_height":
+                self.viewer.fit_height()
             elif self.view_mode == "actual":
                 self.viewer.actual_size()
             else:
@@ -519,6 +597,8 @@ class MainWindow(QMainWindow):
                 fit_mode=self.view_mode,
                 zoom_factor=self.page_zoom_factor,
                 rotation=self.page_rotation,
+                trim_mode=self.trim_mode,
+                trim_margins=self.trim_margins.as_tuple(),
             ),
         )
 
@@ -529,7 +609,72 @@ class MainWindow(QMainWindow):
         self.view_mode = record.state.fit_mode
         self.page_zoom_factor = record.state.zoom_factor
         self.page_rotation = record.state.rotation
+        self.trim_mode = record.state.trim_mode
+        self.trim_margins = TrimMargins(*record.state.trim_margins).normalized()
         self._sync_reading_actions()
+        self._sync_view_actions()
+
+    def _sync_view_actions(self) -> None:
+        if not hasattr(self, "fit_action"):
+            return
+        self.fit_action.setChecked(self.view_mode == "fit_page")
+        self.fit_width_action.setChecked(self.view_mode == "fit_width")
+        self.fit_height_action.setChecked(self.view_mode == "fit_height")
+        self.actual_action.setChecked(self.view_mode == "actual")
+        if hasattr(self, "trim_off_action"):
+            self.trim_off_action.setChecked(self.trim_mode == "off")
+            self.trim_auto_action.setChecked(self.trim_mode == "auto")
+            self.trim_manual_action.setChecked(self.trim_mode == "manual")
+
+    def set_trim_mode(self, mode: str, margins: TrimMargins | None = None) -> None:
+        if mode == "manual" and margins is None:
+            margins = self._choose_trim_margins()
+            if margins is None:
+                self._sync_view_actions()
+                return
+        self.trim_mode = mode if mode in {"off", "auto", "manual"} else "off"
+        if margins is not None:
+            self.trim_margins = margins.normalized()
+        self.viewer.set_trim(self.trim_mode, self.trim_margins)
+        self._sync_view_actions()
+        if self.entries:
+            self._request_image()
+
+    def _choose_trim_margins(self) -> TrimMargins | None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("手動裁切邊距")
+        form = QFormLayout(dialog)
+        fields = []
+        for label, value in zip(
+            ("左側 (%)", "上方 (%)", "右側 (%)", "下方 (%)"),
+            self.trim_margins.as_tuple(),
+            strict=True,
+        ):
+            field = QSpinBox(dialog)
+            field.setRange(0, 40)
+            field.setValue(value)
+            field.setSuffix(" %")
+            form.addRow(label, field)
+            fields.append(field)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            parent=dialog,
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return TrimMargins(*(field.value() for field in fields))
+
+    def _rerender_pdf_for_viewport(self) -> None:
+        if (
+            not self.loading
+            and self.entries
+            and self.source_identity is not None
+            and self.source_identity.source_type is SourceType.PDF
+        ):
+            self._request_image()
 
     def toggle_current_bookmark(self) -> None:
         if not self.entries or self.source_identity is None:
@@ -624,16 +769,16 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "操作說明",
-            f"Ctrl+O：開啟 {self.registry.format_label()}；Ctrl+Shift+O：開啟資料夾\n"
+            f"Ctrl+O：開啟 {self.content_registry.format_label()}；Ctrl+Shift+O：開啟資料夾\n"
             "← / →：依閱讀方向翻頁；PageUp / PageDown：上一頁 / 下一頁\n"
             "Backspace / Space：上一張 / 下一張\nHome / End：第一張 / 最後一張\n"
-            "+ / = / -：縮放　0：符合視窗　1：100%\n"
+            "+ / = / -：縮放　0：符合視窗　1：100%　2：符合寬度　3：符合高度\n"
             "R / Shift+R：向右 / 向左旋轉\nF / F11：全螢幕　Esc：離開全螢幕\n"
             "Ctrl+滾輪：縮放；一般滾輪：捲動；按住滑鼠左鍵：拖移\n"
-            "T：縮圖側欄；檢視／閱讀選單：雙頁、封面與左右閱讀方向\n\n"
+            "T：縮圖側欄；檢視選單可設定雙頁與非破壞邊框裁切\n\n"
             "100% 表示一個圖片像素對應一個螢幕實體像素。\n"
             "閱讀位置、閱讀模式、旋轉與書籤會保存在本機；密碼不會保存。\n"
-            "圖片與壓縮檔均不會被修改。",
+            "來源檔案不會因閱讀、旋轉或裁切而被修改。",
         )
 
     @Slot()
@@ -641,7 +786,7 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "關於 ArchiveLens",
-            f"ArchiveLens {__version__}\n直接瀏覽 {self.registry.format_label()} 內的圖片。\n\n"
+            f"ArchiveLens {__version__}\n直接瀏覽 {self.content_registry.format_label()}。\n\n"
             "本機操作、唯讀、無遙測。\nMIT License · PySide6 / Qt\n"
             "第三方元件授權請參閱隨附 THIRD_PARTY_NOTICES.md。",
         )
@@ -665,6 +810,7 @@ class MainWindow(QMainWindow):
             event.acceptProposedAction()
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._pdf_resize_timer.stop()
         self._save_reading_state()
         if self.worker.isRunning() or self.thumbnails.worker.isRunning():
             self._closing = True

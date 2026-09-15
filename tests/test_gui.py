@@ -8,6 +8,7 @@ from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtTest import QTest
 
 from archivelens.diagnostic_fixtures import write_pdf_fixture
+from archivelens.image.trim import TrimMargins
 from archivelens.image.worker import LoadResult
 from archivelens.ui.main_window import MainWindow
 
@@ -133,6 +134,42 @@ def test_pdf_reader_navigation_spread_and_resume(window, tmp_path, wait_until):
     assert window.current_index == 1
     assert window.double_page
     assert hashlib.sha256(source.read_bytes()).digest() == before
+
+
+def test_pdf_viewport_resize_requests_fresh_bounded_render(window, tmp_path, wait_until, qapp):
+    source = tmp_path / "resize.pdf"
+    write_pdf_fixture(source)
+    window.open_content(source)
+    wait_until(lambda: not window.loading)
+    window._pdf_resize_timer.stop()
+    old_token = window._token
+    old_size = window.viewer.image_size
+    window.resize(700, 500)
+    qapp.processEvents()
+    wait_until(lambda: window._token > old_token and not window.loading)
+    assert window.viewer.image_size != old_size
+    assert window.viewer.image_size.width() * window.viewer.image_size.height() <= 16_000_000
+
+
+def test_fit_and_manual_trim_actions_are_persisted_without_source_changes(
+    window, archive, wait_until
+):
+    before = hashlib.sha256(archive.read_bytes()).digest()
+    window.open_archive(archive)
+    wait_until(lambda: not window.loading)
+    original = window.viewer.image_size
+    window.fit_width_current()
+    assert window.view_mode == "fit_width"
+    assert window.fit_width_action.isChecked()
+    window.set_trim_mode("manual", TrimMargins(10, 0, 20, 0))
+    wait_until(lambda: not window.loading)
+    assert window.viewer.image_size.width() < original.width()
+    record = window.reading_store.get(window.source_identity)
+    assert record is not None
+    assert record.state.fit_mode == "fit_width"
+    assert record.state.trim_mode == "manual"
+    assert record.state.trim_margins == (10, 0, 20, 0)
+    assert hashlib.sha256(archive.read_bytes()).digest() == before
 
 
 def test_rapid_navigation_and_stale_result(window, archive, wait_until):

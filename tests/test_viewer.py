@@ -1,9 +1,11 @@
 import pytest
-from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtCore import QPoint, QPointF, QSize, Qt
 from PySide6.QtGui import QColor, QImage, QWheelEvent
 from PySide6.QtTest import QTest
 
 from archivelens.config import MAX_ZOOM, MIN_ZOOM
+from archivelens.image.media import PageMedia
+from archivelens.image.trim import TrimMargins
 from archivelens.ui.image_viewer import ImageViewer
 
 
@@ -35,6 +37,34 @@ def test_fit_resize_rotation_and_aspect_ratio(viewer, qapp):
     assert viewer.rotation == 0
     viewer.rotate_image(-90)
     assert viewer.rotation == 270
+
+
+def test_fit_width_height_and_user_zoom_mode_transitions(viewer, qapp):
+    viewer.fit_width()
+    qapp.processEvents()
+    width_scale = viewer.transform().m11()
+    assert viewer.view_mode == "fit_width"
+    viewer.fit_height()
+    qapp.processEvents()
+    assert viewer.view_mode == "fit_height"
+    assert viewer.transform().m11() != pytest.approx(width_scale)
+    viewer.zoom_in()
+    assert viewer.view_mode == "custom"
+    assert not viewer.fit_mode
+    viewer.actual_size()
+    assert viewer.view_mode == "actual"
+
+
+def test_trim_combines_with_spread_rotation_and_fit(viewer):
+    image = QImage(100, 80, QImage.Format.Format_RGB32)
+    image.fill(QColor("white"))
+    viewer.set_trim("manual", TrimMargins(10, 5, 20, 15))
+    viewer.set_pages((PageMedia(0, image), PageMedia(1, image)))
+    assert viewer.image_size == QSize(152, 64)
+    viewer.rotate_image(90)
+    viewer.fit_width()
+    assert viewer.sceneRect().width() == pytest.approx(64)
+    assert viewer.sceneRect().height() == pytest.approx(152)
 
 
 def test_actual_size_matches_physical_pixels_and_zoom_survives_next_image(viewer):
