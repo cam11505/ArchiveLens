@@ -1,13 +1,14 @@
 # Changelog
 
-## 1.1.0 — release candidate
+## 1.1.0 — 2026-09-15
 
 - Added encrypted ZIP/CBZ (ZipCrypto and AES), 7Z, and bundled Windows RAR/CBR.
 - Added memory-only password dialogs, retry and cancellation.
 - Added animated GIF playback, lazy thumbnails, double pages, cover and LTR/RTL.
 - Persisted non-sensitive viewer preferences; added per-user Windows installer.
 - Extended resource guards, backend/GUI tests, license sources and packaged checks.
-- Formal release remains gated on the checklist in docs/V1.1_QA.md.
+- Automated source, portable and installer verification passed. Physical Explorer,
+  multi-monitor and Windows 10 QA was explicitly deferred for this release.
 
 
 ## 1.0.0 — 2026-09-14
