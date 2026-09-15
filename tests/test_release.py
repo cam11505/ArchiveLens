@@ -1,5 +1,6 @@
 import hashlib
 import json
+from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
@@ -110,3 +111,13 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
     (tmp_path / source_name).write_bytes(b"tampered")
     with pytest.raises(ValueError, match="SHA-256"):
         verify_release_set(tmp_path, "a" * 40)
+
+
+def test_installer_declares_pdf_open_with_without_default_association():
+    script = (Path(__file__).resolve().parents[1] / "scripts" / "ArchiveLens.iss").read_text(
+        encoding="utf-8"
+    )
+    assert 'ValueName: ".pdf"' in script
+    assert "Software\\Classes\\ArchiveLens.Pdf\\shell\\open\\command" in script
+    assert 'Software\\Classes\\.pdf\\OpenWithProgids"' in script
+    assert 'Software\\Classes\\.pdf"; ValueType' not in script
