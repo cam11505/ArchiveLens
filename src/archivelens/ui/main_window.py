@@ -79,11 +79,11 @@ class MainWindow(QMainWindow):
         self._normal_state = Qt.WindowState.WindowNoState
         self._dialogs: list[QMessageBox] = []
         self.viewer = ImageViewer(self)
-        self.message = QLabel(f"拖曳 {self.registry.format_label()} 到這裡")
+        self.message = QLabel(f"拖曳 {self.content_registry.format_label()} 到這裡")
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setWordWrap(True)
         self.message.setStyleSheet("font-size: 22px; padding: 24px;")
-        self.open_button = QPushButton("開啟壓縮檔")
+        self.open_button = QPushButton("開啟檔案")
         self.open_button.clicked.connect(self.choose_archive)
         self.open_folder_button = QPushButton("開啟圖片資料夾")
         self.open_folder_button.clicked.connect(self.choose_folder)
@@ -240,7 +240,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def choose_archive(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "開啟壓縮檔", "", self.registry.file_dialog_filter()
+            self, "開啟內容", "", self.content_registry.file_dialog_filter()
         )
         if path:
             self.open_archive(path)
@@ -332,6 +332,12 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(0)
         self.statusBar().showMessage(self.source_path.name)
         self._update_navigation()
+        viewport = self.viewer.viewport().size()
+        device_ratio = self.viewer.devicePixelRatioF()
+        render_size = (
+            max(1, round(viewport.width() * device_ratio)),
+            max(1, round(viewport.height() * device_ratio)),
+        )
         self.worker.submit(
             LoadRequest(
                 self._token,
@@ -342,6 +348,7 @@ class MainWindow(QMainWindow):
                 self.double_page,
                 self.cover,
                 recursive=self.recursive_folders,
+                render_size=render_size,
             )
         )
 
@@ -409,7 +416,7 @@ class MainWindow(QMainWindow):
                 else:
                     self.worker.cancel_session()
                     self.thumbnails.reset_session()
-                    self.message.setText("已取消密碼輸入，可重新開啟壓縮檔。")
+                    self.message.setText("已取消密碼輸入，可重新開啟內容來源。")
             dialog.password.clear()
             dialog.deleteLater()
 

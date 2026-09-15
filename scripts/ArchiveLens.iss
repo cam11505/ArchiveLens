@@ -42,6 +42,7 @@ Root: HKCU; Subkey: "Software\Classes\Applications\ArchiveLens.exe\SupportedType
 Root: HKCU; Subkey: "Software\Classes\Applications\ArchiveLens.exe\SupportedTypes"; ValueType: string; ValueName: ".7z"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\Applications\ArchiveLens.exe\SupportedTypes"; ValueType: string; ValueName: ".rar"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\Applications\ArchiveLens.exe\SupportedTypes"; ValueType: string; ValueName: ".cbr"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\Applications\ArchiveLens.exe\SupportedTypes"; ValueType: string; ValueName: ".pdf"; ValueData: ""
 
 Root: HKCU; Subkey: "Software\Classes\ArchiveLens.Archive"; ValueType: string; ValueData: "ArchiveLens image archive"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\ArchiveLens.Archive\shell\open\command"; ValueType: string; ValueData: """{app}\ArchiveLens.exe"" ""%1"""
@@ -50,6 +51,9 @@ Root: HKCU; Subkey: "Software\Classes\.cbz\OpenWithProgids"; ValueType: string; 
 Root: HKCU; Subkey: "Software\Classes\.7z\OpenWithProgids"; ValueType: string; ValueName: "ArchiveLens.Archive"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.rar\OpenWithProgids"; ValueType: string; ValueName: "ArchiveLens.Archive"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.cbr\OpenWithProgids"; ValueType: string; ValueName: "ArchiveLens.Archive"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\ArchiveLens.Pdf"; ValueType: string; ValueData: "ArchiveLens PDF document"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\ArchiveLens.Pdf\shell\open\command"; ValueType: string; ValueData: """{app}\ArchiveLens.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\.pdf\OpenWithProgids"; ValueType: string; ValueName: "ArchiveLens.Pdf"; ValueData: ""; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{app}\ArchiveLens.exe"; Description: "Launch ArchiveLens"; Flags: nowait postinstall skipifsilent

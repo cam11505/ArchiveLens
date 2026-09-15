@@ -7,6 +7,7 @@ from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtTest import QTest
 
+from archivelens.diagnostic_fixtures import write_pdf_fixture
 from archivelens.image.worker import LoadResult
 from archivelens.ui.main_window import MainWindow
 
@@ -111,6 +112,27 @@ def test_drag_drop(window, archive, wait_until, qapp):
     assert drop.isAccepted()
     wait_until(lambda: not window.loading)
     assert window.counter.text() == "1 / 3"
+
+
+def test_pdf_reader_navigation_spread_and_resume(window, tmp_path, wait_until):
+    source = tmp_path / "manual.pdf"
+    write_pdf_fixture(source, pages=5)
+    before = hashlib.sha256(source.read_bytes()).digest()
+    window.open_content(source)
+    wait_until(lambda: not window.loading)
+    assert len(window.entries) == 5
+    assert window.entries[0].extension == ".pdf"
+    assert window.viewer.image_size.width() > 0
+    window.go_to(2)
+    wait_until(lambda: not window.loading)
+    window.set_reading(double=True)
+    wait_until(lambda: not window.loading)
+    assert window.counter.text() == "2–3 / 5"
+    window.open_content(source)
+    wait_until(lambda: not window.loading)
+    assert window.current_index == 1
+    assert window.double_page
+    assert hashlib.sha256(source.read_bytes()).digest() == before
 
 
 def test_rapid_navigation_and_stale_result(window, archive, wait_until):

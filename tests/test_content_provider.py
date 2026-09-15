@@ -92,6 +92,7 @@ class RenderedContentProvider(ContentProvider):
         self._open = False
         self._identity = SourceIdentity(SourceType.PDF, "C:/book.pdf")
         self._page = PageDescriptor(0, "Page 1", "1", ".pdf", PageMediaKind.RENDERED, "pdf-page:0")
+        self.requests = []
 
     @property
     def capabilities(self):
@@ -114,6 +115,7 @@ class RenderedContentProvider(ContentProvider):
         return [self._page]
 
     def load_page(self, page, request):
+        self.requests.append(request)
         image = QImage(2, 2, QImage.Format.Format_ARGB32)
         image.fill(QColor("magenta"))
         return ContentPage(image=image)
@@ -136,11 +138,12 @@ def test_worker_accepts_rendered_content_without_archive_semantics(wait_until, m
     worker.result_ready.connect(results.append)
     worker.start()
     try:
-        worker.submit(LoadRequest(1, 1, Path("book.pdf"), 0))
+        worker.submit(LoadRequest(1, 1, Path("book.pdf"), 0, render_size=(800, 600)))
         wait_until(lambda: bool(results))
         assert results[0].error_type is None
         assert results[0].entries[0].media_kind is PageMediaKind.RENDERED
         assert results[0].image.pixelColor(0, 0) == QColor("magenta")
+        assert provider.requests[0].render_size == (800, 600)
     finally:
         worker.stop()
         assert worker.wait(5000)

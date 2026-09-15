@@ -14,6 +14,7 @@ from archivelens.content.base import (
     ContentProvider,
     PageDescriptor,
     PageLoadRequest,
+    PageMediaKind,
     SourceIdentity,
 )
 from archivelens.content.factory import ContentProviderRegistry, create_content_registry
@@ -37,6 +38,7 @@ class LoadRequest:
     cover: bool = True
     thumbnail: bool = False
     recursive: bool = False
+    render_size: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -199,19 +201,33 @@ class ImageWorker(QThread):
                         *indices,
                         *(index + offset for offset in PREFETCH_OFFSETS),
                     ]
+                    render_size = self._render_size(request, len(indices))
                     cache.retain(
-                        PageCacheKey(source_identity, entries[item].cache_id)
+                        PageCacheKey(
+                            source_identity,
+                            entries[item].cache_id,
+                            render_size
+                            if entries[item].media_kind is PageMediaKind.RENDERED
+                            else None,
+                        )
                         for item in retained_indices
                         if 0 <= item < len(entries)
                     )
                     for page_index in indices:
-                        cache_key = PageCacheKey(source_identity, entries[page_index].cache_id)
+                        page_request = PageLoadRequest(
+                            thumbnail_size=THUMBNAIL_SIZE if request.thumbnail else None,
+                            render_size=render_size,
+                        )
+                        cache_key = PageCacheKey(
+                            source_identity,
+                            entries[page_index].cache_id,
+                            page_request.render_size
+                            if entries[page_index].media_kind is PageMediaKind.RENDERED
+                            else None,
+                        )
                         image = cache.get(cache_key)
                         animation = b""
                         if image is None or entries[page_index].extension == ".gif":
-                            page_request = PageLoadRequest(
-                                thumbnail_size=THUMBNAIL_SIZE if request.thumbnail else None
-                            )
                             content = provider.load_page(entries[page_index], page_request)
                             data = content.encoded or b""
                             if content.image is not None:
@@ -288,6 +304,13 @@ class ImageWorker(QThread):
         except Exception:
             # Backend exceptions may contain credentials, including during cleanup.
             logger.error("Archive provider cleanup failed")
+
+    @staticmethod
+    def _render_size(request: LoadRequest, spread_count: int) -> tuple[int, int] | None:
+        if request.thumbnail or request.render_size is None:
+            return None
+        width, height = request.render_size
+        return (max(1, width // max(1, spread_count)), max(1, height))
 
     def _request_cancelled(self, revision: int) -> bool:
         with self._condition:

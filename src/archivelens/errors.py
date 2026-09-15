@@ -8,7 +8,7 @@ class ArchiveLensError(Exception):
 
 
 class PasswordRequiredError(ArchiveLensError):
-    default_message = "此壓縮檔需要密碼。"
+    default_message = "此內容來源需要密碼。"
 
 
 class BadPasswordError(ArchiveLensError):
@@ -16,11 +16,23 @@ class BadPasswordError(ArchiveLensError):
 
 
 class UnsupportedEncryptionError(ArchiveLensError):
-    default_message = "目前版本尚未支援此加密壓縮檔。"
+    default_message = "目前版本尚未支援此內容來源的加密方式。"
 
 
 class CorruptedArchiveError(ArchiveLensError):
     default_message = "無法開啟或讀取壓縮檔：壓縮資料已損壞。"
+
+
+class CorruptedPdfError(ArchiveLensError):
+    default_message = "無法開啟或讀取 PDF：檔案可能已損壞。"
+
+
+class PdfRenderError(ArchiveLensError):
+    default_message = "PDF 頁面轉譯失敗，檔案可能損壞或超過資源限制。"
+
+
+class PdfNotOpenError(ArchiveLensError):
+    default_message = "尚未開啟 PDF。"
 
 
 class ResourceLimitError(ArchiveLensError):

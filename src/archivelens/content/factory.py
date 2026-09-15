@@ -4,6 +4,7 @@ from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistr
 from archivelens.content.archive_provider import ArchiveContentProvider
 from archivelens.content.base import ContentProvider, SourceType
 from archivelens.content.folder_provider import FolderContentProvider
+from archivelens.content.pdf_provider import PdfContentProvider
 from archivelens.errors import UnsupportedArchiveError, UnsupportedContentError
 
 
@@ -15,16 +16,22 @@ class ContentProviderRegistry:
 
     @property
     def supported_extensions(self) -> frozenset[str]:
-        return self.archive_registry.supported_extensions
+        return self.archive_registry.supported_extensions | {".pdf"}
 
     def supports(self, path: str | Path) -> bool:
         source = Path(path)
-        return source.is_dir() or self.archive_registry.supports(source)
+        return (
+            source.is_dir()
+            or source.suffix.casefold() == ".pdf"
+            or self.archive_registry.supports(source)
+        )
 
     def source_type(self, path: str | Path) -> SourceType:
         source = Path(path)
         if source.is_dir():
             return SourceType.FOLDER
+        if source.suffix.casefold() == ".pdf":
+            return SourceType.PDF
         if source.suffix.casefold() not in self.archive_registry.registered_extensions:
             raise UnsupportedArchiveError()
         return SourceType.ARCHIVE
@@ -33,15 +40,23 @@ class ContentProviderRegistry:
         source = Path(path)
         if source.is_dir():
             return FolderContentProvider()
+        if source.suffix.casefold() == ".pdf":
+            return PdfContentProvider()
         if source.suffix.casefold() not in self.archive_registry.registered_extensions:
             raise UnsupportedContentError()
         return ArchiveContentProvider(self.archive_registry)
 
     def file_dialog_filter(self) -> str:
-        return self.archive_registry.file_dialog_filter()
+        archives = " ".join(
+            f"*{item.upper()}" for item in sorted(self.archive_registry.supported_extensions)
+        )
+        return (
+            f"支援的內容 (*.pdf {archives});;PDF 文件 (*.pdf);;"
+            f"{self.archive_registry.file_dialog_filter()}"
+        )
 
     def format_label(self) -> str:
-        return f"{self.archive_registry.format_label()} 或圖片資料夾"
+        return f"{self.archive_registry.format_label()}、PDF 或圖片資料夾"
 
 
 def create_content_registry(
