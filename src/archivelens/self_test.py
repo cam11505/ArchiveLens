@@ -5,6 +5,7 @@ import hashlib
 import json
 import shutil
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
@@ -25,17 +26,38 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from archivelens import __version__
+from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.backend_self_test import check_backends
+from archivelens.content.base import (
+    ContentOpenOptions,
+    PageLoadRequest,
+    SourceType,
+    source_identity_for_path,
+)
+from archivelens.content.folder_provider import FolderContentProvider
+from archivelens.content.pdf_provider import PdfContentProvider
 from archivelens.diagnostic_fixtures import (
     animated_gif,
     password_pdf_fixture,
     pillow_image_fixture,
     write_pdf_fixture,
 )
+from archivelens.errors import BadPasswordError, PasswordRequiredError, ResourceLimitError
 from archivelens.image.decoders import DEFAULT_DECODER_REGISTRY
 from archivelens.image.loader import decode_image
 from archivelens.image.media import PageMedia
+from archivelens.image.trim import TrimMargins, trim_rect
+from archivelens.reading_state import ReaderState, ReadingStateStore
 from archivelens.ui.main_window import MainWindow
+
+
+@contextmanager
+def expected_error(error_type):
+    try:
+        yield
+    except error_type:
+        return
+    raise AssertionError(f"Expected {error_type.__name__}")
 
 
 def demo_image(fmt: str, label: str, color: str) -> bytes:
@@ -45,9 +67,9 @@ def demo_image(fmt: str, label: str, color: str) -> bytes:
     painter.fillRect(70, 70, 1060, 660, QColor(color))
     painter.setPen(QColor("white"))
     painter.setFont(QFont("Arial", 46))
-    painter.drawText(125, 200, "ArchiveLens 1.1")
+    painter.drawText(125, 200, "ArchiveLens 1.2")
     painter.setFont(QFont("Arial", 24))
-    painter.drawText(125, 285, "Archive image and comic viewer")
+    painter.drawText(125, 285, "Local image, comic, folder and PDF reader")
     painter.drawText(125, 620, label)
     painter.end()
     data = QByteArray()
@@ -116,14 +138,31 @@ class SelfTestRunner(QObject):
                 ".jp2",
                 ".j2k",
                 ".j2c",
-            } <= (
-                DEFAULT_DECODER_REGISTRY.supported_extensions
-            )
+            } <= (DEFAULT_DECODER_REGISTRY.supported_extensions)
             self.checks.append("decoder_registry_capabilities")
-            from PySide6.QtCore import QSize
-            from PySide6.QtPdf import QPdfDocument
+            folder_dir = self.directory / "folder"
+            nested_dir = folder_dir / "章節"
+            nested_dir.mkdir(parents=True)
+            (folder_dir / "1.png").write_bytes(demo_image("PNG", "folder", "#286a72"))
+            (nested_dir / "2.png").write_bytes(demo_image("PNG", "nested", "#725440"))
+            folder_hashes = {
+                path: hashlib.sha256(path.read_bytes()).digest()
+                for path in folder_dir.rglob("*.png")
+            }
+            folder = FolderContentProvider()
+            folder.open(folder_dir)
+            assert len(folder.list_pages()) == 1
+            folder.open(folder_dir, options=ContentOpenOptions(recursive=True))
+            assert [page.path for page in folder.list_pages()] == ["1.png", "章節/2.png"]
+            folder.close()
+            assert all(
+                hashlib.sha256(path.read_bytes()).digest() == digest
+                for path, digest in folder_hashes.items()
+            )
+            shutil.rmtree(folder_dir)
+            self.checks.append("folder_flat_recursive_read_only")
 
-            pdf_dir = self.directory / "pdf-spike"
+            pdf_dir = self.directory / "pdf-provider"
             pdf_dir.mkdir()
             ordinary_pdf = pdf_dir / "ordinary.pdf"
             many_pdf = pdf_dir / "many.pdf"
@@ -133,29 +172,59 @@ class SelfTestRunner(QObject):
             write_pdf_fixture(many_pdf, 125)
             write_pdf_fixture(huge_pdf, page_mm=(2000, 2000))
             protected_pdf.write_bytes(password_pdf_fixture())
-            document = QPdfDocument()
+            pdf = PdfContentProvider()
             for path, pages in ((ordinary_pdf, 1), (many_pdf, 125), (huge_pdf, 1)):
-                assert document.load(str(path)) is QPdfDocument.Error.None_
-                assert document.pageCount() == pages
-                assert document.pageLabel(0) == "1"
-                assert not document.render(0, QSize(320, 240)).isNull()
-                document.close()
-            self.checks.append("qtpdf_normal_many_large_bounded_render")
-            assert document.load(str(protected_pdf)) is QPdfDocument.Error.IncorrectPassword
-            document.setPassword("wrong")
-            assert document.load(str(protected_pdf)) is QPdfDocument.Error.IncorrectPassword
-            document.setPassword("reader-secret")
-            assert document.load(str(protected_pdf)) is QPdfDocument.Error.None_
-            assert not document.render(0, QSize(160, 160)).isNull()
-            document.close()
-            document.setPassword("")
-            assert not document.password()
-            self.checks.append("qtpdf_password_session_only")
-            del document
+                pdf.open(path)
+                catalog = pdf.list_pages()
+                assert len(catalog) == pages
+                rendered = pdf.load_page(catalog[0], PageLoadRequest(render_size=(320, 240)))
+                assert rendered.image is not None and not rendered.image.isNull()
+                pdf.close()
+            self.checks.append("pdf_provider_normal_many_large_bounded_render")
+            with expected_error(PasswordRequiredError):
+                pdf.open(protected_pdf)
+            with expected_error(BadPasswordError):
+                pdf.open(protected_pdf, credentials=ArchiveCredentials(b"wrong"))
+            with ArchiveCredentials(b"reader-secret") as credentials:
+                pdf.open(protected_pdf, credentials=credentials)
+            page = pdf.list_pages()[0]
+            assert pdf.load_page(page, PageLoadRequest(render_size=(160, 160))).image is not None
+            assert pdf._document.password() == ""
+            with expected_error(ResourceLimitError):
+                pdf.load_page(page, PageLoadRequest(render_size=(8193, 10)))
+            pdf.close()
+            self.checks.append("pdf_password_session_and_render_guards")
             QApplication.processEvents()
             shutil.rmtree(pdf_dir)
+
+            trim_fixture = QImage(200, 120, QImage.Format.Format_RGB32)
+            trim_fixture.fill(QColor("white"))
+            trim_painter = QPainter(trim_fixture)
+            trim_painter.fillRect(20, 10, 160, 100, QColor("black"))
+            trim_painter.end()
+            assert trim_rect(trim_fixture, "auto").getRect() == (20, 10, 160, 100)
+            assert trim_rect(trim_fixture, "manual", TrimMargins(10, 5, 20, 15)).getRect() == (
+                20,
+                6,
+                140,
+                96,
+            )
+            self.checks.append("bounded_auto_manual_trim")
             self.checks.extend(check_backends(demo_image("PNG", "Backend", "#286a72")))
             self.source_hash = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+            state_path = self.directory / "reading-state.json"
+            state_store = ReadingStateStore(state_path)
+            state_store.update(
+                self.window.source_identity
+                or source_identity_for_path(self.archive, SourceType.ARCHIVE),
+                self.archive.name,
+                ReaderState(page_index=2, page_count=4, fit_mode="fit_width", trim_mode="auto"),
+            )
+            state_payload = state_path.read_text(encoding="utf-8")
+            assert '"schema_version": 2' in state_payload
+            assert "password" not in state_payload.casefold()
+            state_path.unlink()
+            self.checks.append("reading_state_v2_no_credentials")
             self.window.activateWindow()
             mime = QMimeData()
             mime.setUrls([QUrl.fromLocalFile(str(self.archive))])
@@ -218,22 +287,33 @@ class SelfTestRunner(QObject):
                 assert viewer.rotation == 0
                 QTest.keyClick(self.window, Qt.Key.Key_0)
                 assert viewer.fit_mode
-                self.checks.append("physical_100_zoom_rotate_fit")
-                QTest.keyClick(self.window, Qt.Key.Key_F11)
+                QTest.keyClick(self.window, Qt.Key.Key_2)
+                assert viewer.view_mode == "fit_width"
+                QTest.keyClick(self.window, Qt.Key.Key_3)
+                assert viewer.view_mode == "fit_height"
+                self.checks.append("physical_100_zoom_rotate_fit_modes")
+                self.window.set_trim_mode("manual", TrimMargins(10, 0, 20, 0))
             elif self.phase == 4:
+                assert viewer.image_size.width() == 840
+                self.checks.append("manual_trim_display_only")
+                self.window.set_trim_mode("off")
+            elif self.phase == 5:
+                self._page(1)
+                QTest.keyClick(self.window, Qt.Key.Key_F11)
+            elif self.phase == 6:
                 assert self.window.isFullScreen()
                 QTest.keyClick(self.window, Qt.Key.Key_Escape)
-            elif self.phase == 5:
+            elif self.phase == 7:
                 assert not self.window.isFullScreen()
                 self.checks.append("fullscreen_escape")
                 QTest.keyClick(self.window, Qt.Key.Key_End)
-            elif self.phase == 6:
+            elif self.phase == 8:
                 self._page(3)
                 QTest.keyClick(self.window, Qt.Key.Key_Right)
                 self._page(3)
                 self.checks.append("webp_last_page_boundary")
                 self.window.go_to(1)
-            elif self.phase == 7:
+            elif self.phase == 9:
                 self._page(1)
                 if self.screenshot:
                     self.screenshot.parent.mkdir(parents=True, exist_ok=True)
@@ -242,12 +322,12 @@ class SelfTestRunner(QObject):
                 assert list(self.directory.iterdir()) == [self.archive]
                 self.checks.append("source_unchanged_no_image_extraction")
                 self.window.set_reading(double=True, rtl=True)
-            elif self.phase == 8:
+            elif self.phase == 10:
                 assert self.window.counter.text() == "2–3 / 4"
                 assert viewer._group is not None
                 self.checks.append("double_page_rtl")
                 self.window.thumbnail_dock.show()
-            elif self.phase == 9:
+            elif self.phase == 11:
                 if not len(self.window.thumbnails.catalog.cache):
                     return
                 self.checks.append("lazy_thumbnail_sidebar")

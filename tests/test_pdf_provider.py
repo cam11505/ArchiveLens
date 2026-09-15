@@ -1,5 +1,6 @@
 import hashlib
 from pathlib import Path
+from threading import Event
 
 import pytest
 
@@ -16,6 +17,7 @@ from archivelens.errors import (
     PdfNotOpenError,
     ResourceLimitError,
 )
+from archivelens.image.worker import ImageWorker, LoadRequest
 
 
 def test_pdf_provider_lists_stable_pages_and_renders_bounded_images(tmp_path, qapp):
@@ -58,9 +60,10 @@ def test_pdf_provider_password_retry_and_session_cleanup(tmp_path, qapp):
     with pytest.raises(BadPasswordError):
         provider.open(source, credentials=ArchiveCredentials(b"wrong"))
     provider.open(source, credentials=secret)
-    assert provider.load_page(
-        provider.list_pages()[0], PageLoadRequest(render_size=(320, 480))
-    ).image is not None
+    assert (
+        provider.load_page(provider.list_pages()[0], PageLoadRequest(render_size=(320, 480))).image
+        is not None
+    )
     assert provider._document.password() == ""
     provider.close()
     secret.clear()
@@ -97,3 +100,34 @@ def test_pdf_registry_open_dialog_and_case_insensitive_selection():
     assert isinstance(registry.create("book.pdf"), PdfContentProvider)
     assert "*.pdf" in registry.file_dialog_filter()
     assert ".pdf" in registry.supported_extensions
+
+
+def test_pdf_render_navigation_suppresses_stale_result(tmp_path, qapp, wait_until, monkeypatch):
+    source = tmp_path / "rapid.pdf"
+    write_pdf_fixture(source, pages=2)
+    entered, release = Event(), Event()
+    original = PdfContentProvider._render_page
+
+    def delayed(provider, page_index, size):
+        if page_index == 0 and not entered.is_set():
+            entered.set()
+            assert release.wait(5)
+        return original(provider, page_index, size)
+
+    monkeypatch.setattr(PdfContentProvider, "_render_page", delayed)
+    worker = ImageWorker()
+    results = []
+    worker.result_ready.connect(results.append)
+    worker.start()
+    try:
+        worker.submit(LoadRequest(1, 1, source, 0, render_size=(400, 400)))
+        wait_until(entered.is_set)
+        worker.submit(LoadRequest(2, 1, source, 1, render_size=(400, 400)))
+        release.set()
+        wait_until(lambda: bool(results))
+        assert [result.token for result in results] == [2]
+        assert results[0].index == 1
+    finally:
+        release.set()
+        worker.stop()
+        assert worker.wait(5000)

@@ -170,9 +170,7 @@ class PillowImageDecoder(ImageDecoder):
                 self._guard_size(*image.size)
                 raw = image.tobytes()
                 qt_format = (
-                    QImage.Format.Format_RGBA8888
-                    if has_alpha
-                    else QImage.Format.Format_RGB888
+                    QImage.Format.Format_RGBA8888 if has_alpha else QImage.Format.Format_RGB888
                 )
                 result = QImage(
                     raw,

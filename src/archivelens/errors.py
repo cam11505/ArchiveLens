@@ -1,7 +1,7 @@
 class ArchiveLensError(Exception):
     """A recoverable error whose message can be displayed to the user."""
 
-    default_message = "載入失敗，請嘗試其他圖片或重新開啟壓縮檔。"
+    default_message = "載入失敗，請嘗試其他頁面或重新開啟內容來源。"
 
     def __init__(self, message: str | None = None) -> None:
         super().__init__(message or self.default_message)

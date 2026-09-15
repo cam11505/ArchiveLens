@@ -78,18 +78,17 @@ class PdfContentProvider(ContentProvider):
             document.setPassword(decoded_password)
         error = document.load(str(source))
         if error != QPdfDocument.Error.None_:
-            document.setPassword("")
-            document.close()
+            self._dispose(document)
             self._raise_load_error(error, supplied)
 
         # QtPdf keeps the decrypted document usable after load; do not retain plaintext.
         document.setPassword("")
         page_count = document.pageCount()
         if page_count > config.MAX_PDF_PAGES:
-            document.close()
+            self._dispose(document)
             raise ResourceLimitError()
         if page_count <= 0:
-            document.close()
+            self._dispose(document)
             raise EmptyContentError()
 
         pages = []
@@ -126,8 +125,16 @@ class PdfContentProvider(ContentProvider):
         self._identity = None
         self._pages = ()
         if document is not None:
+            self._dispose(document)
+
+    @staticmethod
+    def _dispose(document) -> None:
+        import shiboken6
+
+        if shiboken6.isValid(document):
             document.setPassword("")
             document.close()
+            shiboken6.delete(document)
 
     def list_pages(self) -> list[PageDescriptor]:
         if self._document is None:

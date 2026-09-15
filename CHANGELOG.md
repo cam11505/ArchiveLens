@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 — 2026-09-16
+
+- Added a source-neutral ContentProvider layer for archives, image folders and PDF.
+- Added bounded flat/recursive folder reading with reparse-point loop protection.
+- Added local resume/history/bookmarks with schema migration and no credential storage.
+- Added AVIF and JPEG 2000 through Pillow 12.3, plus Qt TIFF; documented HEIC/HEIF
+  and JPEG XL as explicitly deferred after backend/license/resource evaluation.
+- Added QtPdf reading, supported password retry, thumbnails, double-page display,
+  high-DPI bounded rendering and PDF Open With registration.
+- Added Fit Width/Height and conservative display-only automatic/manual border trim.
+- Extended package diagnostics, licenses, resource/stale-result tests and Windows RC checks.
+
 ## 1.1.0 — 2026-09-15
 
 - Added encrypted ZIP/CBZ (ZipCrypto and AES), 7Z, and bundled Windows RAR/CBR.

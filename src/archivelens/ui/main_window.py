@@ -388,9 +388,7 @@ class MainWindow(QMainWindow):
         viewport = self.viewer.viewport().size()
         device_ratio = self.viewer.devicePixelRatioF()
         width = min(config.MAX_PDF_RENDER_EDGE, max(1, round(viewport.width() * device_ratio)))
-        height = min(
-            config.MAX_PDF_RENDER_EDGE, max(1, round(viewport.height() * device_ratio))
-        )
+        height = min(config.MAX_PDF_RENDER_EDGE, max(1, round(viewport.height() * device_ratio)))
         if self.view_mode == "fit_width":
             render_size = (width, config.MAX_PDF_RENDER_EDGE)
         elif self.view_mode == "fit_height":

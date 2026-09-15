@@ -1,4 +1,33 @@
-# Provider development (issue #2)
+# Provider development
+
+## Content providers (v1.2)
+
+`ContentProviderRegistry` is the only reader-facing source-selection boundary.
+It maps local directories to `FolderContentProvider`, `.pdf` to
+`PdfContentProvider`, and supported archive extensions to
+`ArchiveContentProvider`. The reader consumes stable `PageDescriptor` objects and
+either encoded raster bytes or a provider-rendered `QImage`; PDF pages are never
+represented as fake archive entries.
+
+Each `ImageWorker` creates, opens, uses and closes its provider inside the worker
+thread. A worker has one in-flight operation and one replaceable pending request.
+PDF documents are therefore rendered synchronously in their owner thread without
+an additional backend queue; PDFs do not prefetch. Cache identity includes source,
+page and PDF render size. Main and thumbnail workers have separate provider
+instances and byte-bounded caches.
+
+Folders are scanned iteratively. Flat/recursive behavior is explicit, traversal
+checks cancellation, count and depth limits, and Windows reparse points/junctions
+and symlinks are never followed. Inaccessible non-root children are skipped; an
+inaccessible root is a recoverable content error.
+
+QtPdf credentials use the same owned `ArchiveCredentials` transfer as encrypted
+archives. A successful load clears the plaintext password from `QPdfDocument`;
+wrong/missing/unsupported security paths are typed, recoverable errors. Closing a
+PDF explicitly destroys the native document in its owner thread so Windows file
+handles are released. No provider writes source data or persists credentials.
+
+## Archive backends
 
 `ArchiveProviderRegistry` is the shared selection boundary for the worker, CLI,
 file dialog and drag/drop. The default registry enables ZIP/CBZ and 7Z; RAR/CBR is available when the

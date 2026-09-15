@@ -34,7 +34,7 @@ def main():
         )
     original_defaults = {
         ext: registry_value("Software\\Classes\\" + ext)
-        for ext in (".zip", ".rar", ".7z", ".cbz", ".cbr")
+        for ext in (".zip", ".rar", ".7z", ".cbz", ".cbr", ".pdf")
     }
     root = Path(__file__).resolve().parents[1]
     output = root / "outputs" / "installer-verification"
@@ -80,6 +80,11 @@ def main():
         command = registry_value(app_key + r"\shell\open\command")
         if command != f'"{target}\\ArchiveLens.exe" "%1"':
             raise RuntimeError("Open With command mismatch")
+        pdf_command = registry_value(r"Software\Classes\ArchiveLens.Pdf\shell\open\command")
+        if pdf_command != f'"{target}\\ArchiveLens.exe" "%1"':
+            raise RuntimeError("PDF Open With command mismatch")
+        if registry_value(r"Software\Classes\.pdf\OpenWithProgids", "ArchiveLens.Pdf") is None:
+            raise RuntimeError("PDF Open With ProgID is missing")
         subprocess.run(
             [str(target / "ArchiveLens.exe"), "--self-test-report", str(report)],
             cwd=target,
@@ -89,7 +94,7 @@ def main():
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         results = json.loads(report.read_text(encoding="utf-8"))
-        if not results["success"] or len(results["checks"]) < 15:
+        if not results["success"] or len(results["checks"]) < 23:
             raise RuntimeError("Installed self-test failed")
     finally:
         if installed and uninstall.is_file():
@@ -120,6 +125,7 @@ def main():
         "checks": [
             "installed_manifest",
             "open_with_registration",
+            "pdf_open_with_registration",
             "installed_self_test",
             "uninstall_cleanup",
             "user_file_preserved",

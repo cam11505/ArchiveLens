@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QLabel, QLin
 class PasswordDialog(QDialog):
     def __init__(self, message: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("壓縮檔密碼")
+        self.setWindowTitle("內容來源密碼")
         self.setModal(True)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(message))

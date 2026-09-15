@@ -1,36 +1,47 @@
-# ArchiveLens 1.1 development
+# ArchiveLens 1.2 development
 
-The v1.1 plan remains in V1.1_PLAN.md. Provider ownership/error contracts are in
-PROVIDERS.md; dependency and redistribution decisions are in BACKENDS.md.
+The normative scope and release order are in `V1.2_PLAN.md`. `PROVIDERS.md`
+defines source/provider ownership, while `IMAGE_BACKENDS.md`, `QTPDF_BACKEND.md`
+and `BACKENDS.md` record dependency and redistribution decisions.
 
-- Full-image and thumbnail workers have separate providers and single replaceable
-  pending requests. Tokens plus archive/credential revisions suppress stale results.
-- Thumbnails request at most the visible 24 rows sequentially, using scaled decode.
-  Scrolling replaces pending work; hidden sidebars stop requesting. Solid backends
-  have no speculative prefetch. No full-resolution catalog scan at open.
-- Full-image LRU remains 256 MiB, shared across a spread. GIF bytes are separate,
-  capped at 32 MiB per page; QMovie CacheNone avoids retaining every frame.
-- Spread pairing is pure logic in image/reading.py; physical arrow mapping is
-  separate from logical next/previous. Scene items share zoom and transform.
-- Settings use only a fixed allowlist: geometry/state, thumbnails, double_page,
-  rtl and cover. Tests and self-test isolate the settings store.
-- Plain ZIP keeps Python zipfile; AES members use pyzipper. 7Z uses a bounded
-  WriterFactory. UnRAR uses RAR_TEST memory callbacks and UTF-16 password callbacks.
-- Entry count/size/ratio/pixels and cache/media limits are centralized in config.py.
-  They are not a process sandbox. Parsing metadata or decompressing a solid prefix
-  may allocate/work before application-level checks complete.
+## Architecture and bounds
 
-Run pytest, Ruff check and Ruff format check. Run `python -m archivelens
---self-test-report outputs/self-test.json` for native GUI/backend diagnostics.
-The self-test exercises real encrypted ZIP/AES/7Z and bundled RAR4/RAR5, plus
-animation, thumbnails and double pages, beyond the original eight v1.0 checks.
+- `ContentProviderRegistry` selects archive, folder or PDF providers. Storage-specific
+  metadata never leaks into reader page descriptors.
+- Main-image and thumbnail workers each own one provider and one replaceable pending
+  request. Generation/token/credential checks suppress stale results. PDFs do not prefetch.
+- Folder traversal is iterative and bounded by count/depth, ignores inaccessible children,
+  never follows symlinks/reparse points, and can be cancelled during source switches.
+- Decoder selection is centralized. Byte, compression, pixel, PDF render, cache, history,
+  bookmark, folder and auto-trim bounds live in `config.py`.
+- Reading state is versioned JSON written atomically under the per-user application-data
+  directory. Schema v2 reads v0/v1 records safely. Credentials and decoded/rendered data
+  are outside the persistence model.
+- Fit, rotation and trim are display state. Auto trim examines a bounded preview and fails
+  conservatively; PDF resize/DPI changes replace the pending bounded render.
 
-On Windows, run prepare_backends.py before tests/build; it verifies SDK and DLL
-hashes. Run prepare_licenses.py to fetch exact sources (including LGPL archive
-libraries). Build portable, commit all sources, package_release.py, then build the
-installer. verify_installer.py checks install, self-test and uninstall in a unique
-workspace directory. CI runs source tests on Windows/Linux and packages on Windows.
+## Source checks
 
-Do not tag v1.1.0 until the manual items in V1.1_QA.md and exact-commit CI/release
-checks are completed or explicitly deferred with rationale. Automated Qt events
-are not evidence of physical Explorer interaction or multi-monitor manual QA.
+```powershell
+python -m pytest -q
+python -m ruff check src tests scripts
+python -m ruff format --check src tests scripts
+python -m archivelens --self-test-report outputs/self-test.json
+```
+
+On Windows, run `prepare_backends.py` before backend tests/builds. The self-test exercises
+encrypted ZIP/7Z/RAR, AVIF/JP2/TIFF, folder traversal, QtPdf normal/password/resource paths,
+fit/trim, animation, thumbnails, reading-state safety and source immutability.
+
+## Reproducible Windows release
+
+Run `prepare_licenses.py` to collect exact installed licenses and corresponding source
+archives. Build from a clean committed checkout, then run `build_portable.py`,
+`package_release.py`, `build_installer.py`, `verify_release.py --run`,
+`verify_installer.py`, and `release_checksums.py`. Build metadata records the exact commit;
+portable and installer verification reject a different commit or incomplete manifest.
+
+CI repeats source tests on Windows/Linux and full portable/installer checks on a clean
+Windows runner. Do not tag v1.2.0 until the exact-commit CI artifacts, local checksum
+verification and `V1.2_QA.md` release-candidate decisions are complete. Automated
+offscreen tests are not evidence of physical Explorer or multi-monitor behavior.

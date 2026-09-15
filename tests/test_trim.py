@@ -34,8 +34,6 @@ def test_auto_trim_conservatively_keeps_artwork_and_is_sample_bounded():
 
 def test_manual_trim_is_per_edge_bounded_and_predictable():
     image = QImage(1000, 500, QImage.Format.Format_RGB32)
-    assert trim_rect(image, "manual", TrimMargins(10, 20, 30, 5)) == QRect(
-        100, 100, 600, 375
-    )
+    assert trim_rect(image, "manual", TrimMargins(10, 20, 30, 5)) == QRect(100, 100, 600, 375)
     assert TrimMargins(-1, 99, 5, 6).normalized() == TrimMargins(0, 40, 5, 6)
     assert trim_rect(image, "invalid") == image.rect()

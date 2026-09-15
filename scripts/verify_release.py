@@ -10,6 +10,8 @@ import tempfile
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
+from archivelens import __version__
+
 
 def verify_archive(
     path: Path, expected_commit: str | None = None, allow_development: bool = False
@@ -58,6 +60,8 @@ def verify_archive(
             "_internal/PySide6/plugins/imageformats/qtiff.dll",
             "_internal/PySide6/QtPdf.pyd",
             "_internal/PySide6/Qt6Pdf.dll",
+            "licenses/Pillow/LICENSE",
+            "licenses/qtpdf/LICENSE.Chromium",
         }
         if not required.issubset(manifest):
             raise ValueError("Required application files are missing")
@@ -69,7 +73,7 @@ def verify_archive(
         ):
             raise ValueError("Unused Qt modules must not be distributed")
         build = json.loads(archive.read("ArchiveLens/build-info.json"))
-        if build["version"] != "1.1.0":
+        if build["version"] != __version__:
             raise ValueError("Unexpected release version")
         if build["development"] and not allow_development:
             raise ValueError("This is a development package, not a release")
@@ -106,7 +110,7 @@ def run_packaged_test(path: Path, output: Path) -> dict:
         startup.wShowWindow = subprocess.SW_HIDE
         subprocess.run(command, cwd=target, env=env, startupinfo=startup, check=True, timeout=60)
         result = json.loads(report.read_text(encoding="utf-8"))
-        if not result["success"] or len(result["checks"]) < 15:
+        if not result["success"] or len(result["checks"]) < 23:
             raise ValueError("Packaged application did not pass all acceptance checks")
         return result
 

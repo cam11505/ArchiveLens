@@ -1,1 +1,1 @@
-"""Decode archive image bytes without temporary files."""
+"""Decode content images in memory without temporary files."""
