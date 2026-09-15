@@ -12,7 +12,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["setuptools", "pkg_resources", "tkinter", "PySide6.QtPdf", "PySide6.QtSvg", "PySide6.QtQml",
+    excludes=["setuptools", "pkg_resources", "tkinter", "PySide6.QtSvg", "PySide6.QtQml",
               "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets"],
     noarchive=False,
 )
@@ -24,7 +24,7 @@ def required_binary(item):
     if "/imageformats/" in name:
         return name.rsplit("/", 1)[-1] in allowed_images
     # Qt uses the Windows ICU ABI; a different ICU found on PATH is incompatible.
-    return name.rsplit("/", 1)[-1] not in {"qt6pdf.dll", "qt6svg.dll", "icuuc.dll", "icudt78.dll"}
+    return name.rsplit("/", 1)[-1] not in {"qt6svg.dll", "icuuc.dll", "icudt78.dll"}
 a.binaries = [item for item in a.binaries if required_binary(item)]
 pyz = PYZ(a.pure)
 exe = EXE(

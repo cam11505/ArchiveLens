@@ -1,0 +1,111 @@
+# ArchiveLens v1.2 QtPdf backend decision
+
+Decision date: **2026-09-16**
+
+Test host: Windows 11 x64 build 22631, Python 3.12.14, PySide6/Qt 6.11.2,
+PyInstaller 6.22.3 and Inno Setup 6.7.3. The reproducible source probe is
+`scripts/spike_qtpdf.py`.
+
+## Decision
+
+QtPdf is approved for the v1.2 `PdfContentProvider`. PDF pages remain rendered
+content pages and must not be represented as archive entries. The tested runtime
+is `PySide6.QtPdf.QPdfDocument` backed by the dynamically loaded `Qt6Pdf.dll`.
+
+Qt documents `QPdfDocument.load(QIODevice)` and `load(fileName)`, page count,
+labels, 1/72-inch point sizes, session password setting and exact requested-size
+rendering. Qt PDF 6.11.2 is available under LGPL-3.0 or GPL-2.0 and includes a
+PDFium snapshot plus permissively licensed third-party components.
+
+Official references:
+
+- <https://doc.qt.io/qtforpython-6/PySide6/QtPdf/QPdfDocument.html>
+- <https://doc.qt.io/qtforpython-6/PySide6/QtPdf/QPdfPageRenderer.html>
+- <https://doc.qt.io/qt-6/qtpdf-licensing.html>
+
+## Measured behavior
+
+| Fixture | Result | First-page points | Requested render |
+| --- | --- | --- | --- |
+| 1-page A4 | Ready, label `1` | 595 x 842 | 512 x 724 |
+| 125-page A4 | Ready, 125 descriptors | 595 x 842 | 144 x 204 thumbnail |
+| 2000 x 2000 mm vector page | Ready | 5669 x 5669 | bounded 1024 x 1024 |
+| Password PDF, no password | `IncorrectPassword` | n/a | not rendered |
+| Password PDF, wrong password | `IncorrectPassword` | n/a | not rendered |
+| Password PDF, correct password | Ready, 1 page | 595 x 842 | 256 x 256 |
+
+The source probe measured ordinary/125-page loads at approximately 6.5/12.5 ms
+on the spike host. These timings are evidence, not performance guarantees.
+
+`QPdfDocument.render()` returns exactly the requested pixel size and returns an
+empty `QImage` on failure. The provider must calculate an aspect-correct requested
+size from `pagePointSize()`; it must not pass arbitrary viewport dimensions.
+
+## Render scheduling and lifecycle for #28
+
+Use the existing long-lived `ImageWorker`, which creates and owns its provider in
+the worker thread. `PdfContentProvider` creates, loads, renders and closes its
+`QPdfDocument` only in that same thread.
+
+- Allow one in-flight synchronous render per worker
+  (`MAX_PDF_PENDING_RENDERS = 1`).
+- Keep only the latest pending reader request; generation/token checks suppress
+  stale results after rapid navigation or source switching.
+- The main-page and thumbnail workers may each own one document, so the application
+  has at most two independent renders in flight.
+- Do not prefetch PDF pages in v1.2. The cache key includes source, page and exact
+  render size. Existing byte-bounded image caches limit retained raster memory.
+- A source switch or close is recorded immediately, but the document is closed by
+  its owner worker only after a bounded render call returns. QtPdf rendering is not
+  treated as cancellable.
+
+`QPdfPageRenderer` was reviewed but is not selected. Qt documents that it owns an
+internal request queue and returns completed images asynchronously. It does not
+expose queue depth or cancellation APIs needed by ArchiveLens. Adding another
+queue would weaken the existing replaceable-pending-request guarantee.
+
+## Central resource policy
+
+- `MAX_PDF_PAGES = 100_000`.
+- `MAX_PDF_RENDER_PIXELS = 16_000_000` (approximately 64 MiB for one RGBA image).
+- `MAX_PDF_RENDER_EDGE = 8192` prevents pathological one-dimensional allocations.
+- `MAX_PDF_PENDING_RENDERS = 1` per worker.
+- Thumbnail requests remain capped by the existing 144-pixel thumbnail bound.
+- Requested width/height and their product are checked before calling QtPdf; the
+  returned image dimensions and null state are checked again afterward.
+
+High-DPI requests use device pixels derived from logical target size, device pixel
+ratio and reader zoom, then clamp to the limits above while preserving page aspect.
+
+## Password handling
+
+The tested standard-encryption fixture emitted/returned `IncorrectPassword` for
+missing and wrong values and loaded after `setPassword()` with the correct value.
+The provider maps this to the existing required/wrong/cancel UI flow. Passwords
+remain session-only, are never logged or persisted, and are cleared on close/source
+switch. Qt/Python strings cannot provide a guaranteed zeroization claim.
+
+Unsupported security maps to a distinct recoverable error. Cancel closes the
+provider without retrying and without adding credentials to history/state.
+
+## Windows packaging evidence
+
+The development portable inventory contains 501 files and 126,134,264 bytes,
+including `Qt6Pdf.dll` (4,620,600 bytes) and `QtPdf.pyd` (246,584 bytes). Its
+manifest-backed ZIP is 52,065,306 bytes. The packaged self-test passed with Python,
+Qt and virtual-environment variables removed and `PATH` limited to Windows system
+directories.
+
+Because the machine already had the user's production ArchiveLens v1.1.0 installed,
+the Inno test used `ArchiveLens.QtPdfSpike.iss`: a separate AppId with no file
+associations. Installed manifest/runtime checks, normal/password/large PDF self-test,
+uninstall cleanup and preservation of a user-owned PDF all passed. The production
+installer and existing v1.1.0 were not modified.
+
+Release packaging collected the exact 580,351,104-byte official Qt WebEngine/PDF
+6.11.2 source archive and 1,923 license/notice files under `licenses/qtpdf/`.
+Its SHA-256 is
+`6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163`,
+which matches Qt's official Metalink. The source archive is included in release
+checksums. Final #30 hardening repeats portable and production-installer
+verification from a clean v1.2 commit.

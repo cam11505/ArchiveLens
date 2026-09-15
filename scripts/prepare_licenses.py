@@ -7,15 +7,29 @@ import shutil
 import sys
 import tarfile
 import urllib.request
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
 
 def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
-    name, repository = source
-    archive = root / "build" / "upstream-sources" / f"{name}-{version}.tar.gz"
+    name, location = source
+    if location.startswith("https://"):
+        url = location.format(version=version)
+        filename = url.rsplit("/", 1)[-1]
+        with urllib.request.urlopen(url + ".meta4", timeout=30) as response:
+            metalink = ET.fromstring(response.read())
+        expected_sha256 = next(
+            item.text
+            for item in metalink.iter("{urn:ietf:params:xml:ns:metalink}hash")
+            if item.attrib.get("type") == "sha-256"
+        )
+    else:
+        url = f"https://codeload.github.com/{location}/tar.gz/refs/tags/v{version}"
+        filename = f"{name}-{version}.tar.gz"
+        expected_sha256 = None
+    archive = root / "build" / "upstream-sources" / filename
     archive.parent.mkdir(parents=True, exist_ok=True)
-    url = f"https://codeload.github.com/{repository}/tar.gz/refs/tags/v{version}"
     if not archive.exists():
         partial = archive.with_suffix(".part")
         with urllib.request.urlopen(url, timeout=60) as response, partial.open("wb") as output:
@@ -23,7 +37,7 @@ def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
         partial.replace(archive)
     destination = root / "build" / "third-party-licenses" / name
     count = 0
-    with tarfile.open(archive, "r:gz") as source_tar:
+    with tarfile.open(archive, "r:*") as source_tar:
         for member in source_tar:
             path = PurePosixPath(member.name)
             if not member.isfile() or path.is_absolute() or ".." in path.parts:
@@ -49,12 +63,15 @@ def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
         raise RuntimeError(f"No upstream licenses found in {archive}")
     with archive.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    if expected_sha256 and digest != expected_sha256:
+        raise RuntimeError(f"Official source checksum mismatch for {archive.name}")
     return {
         "component": name,
         "version": version,
         "source_url": url,
         "source_archive": archive.name,
         "sha256": digest,
+        "official_sha256_verified": bool(expected_sha256),
         "license_files": count,
     }
 
@@ -65,6 +82,11 @@ def main() -> int:
     sources = [
         ("qtbase", "qt/qtbase"),
         ("qtimageformats", "qt/qtimageformats"),
+        (
+            "qtpdf",
+            "https://download.qt.io/archive/qt/6.11/{version}/submodules/"
+            "qtwebengine-everywhere-src-{version}.tar.xz",
+        ),
         ("pyside-setup", "pyside/pyside-setup"),
     ]
     with ThreadPoolExecutor(max_workers=3) as executor:

@@ -1,8 +1,33 @@
 """Small synthetic media/ZipCrypto fixtures for source and packaged diagnostics."""
+# ruff: noqa: E501 -- embedded encrypted fixture is intentionally immutable base64.
 
+import base64
 import io
 import struct
 import zipfile
+
+_PASSWORD_PDF = """JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PAovUHJvZHVjZXIgPDUyZjg1NWJhYmE+Cj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9UeXBlIC9QYWdlcwovQ291bnQgMQovS2lkcyBbIDQgMCBSIF0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iago0IDAgb2JqCjw8Ci9UeXBlIC9QYWdlCi9Db250ZW50cyA1IDAgUgovUmVzb3VyY2VzIDYgMCBSCi9Bbm5vdHMgMTEgMCBSCi9NZWRpYUJveCBbIDAgMCA1OTUgODQyIF0KL1RyaW1Cb3ggWyAwIDAgNTk1IDg0MiBdCi9QYXJlbnQgMiAwIFIKPj4KZW5kb2JqCjUgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAzNzQKPj4Kc3RyZWFtCr8JppIfcewx8qU4tcvIpx7wb1dhqcZmqFTzZKkb4FhEZnuRLz3sotR69Q6CQ6iWBMYpi51ueAaNqXZNPmOZSkISLwrW7d0CYD9a0sIF97SafSrsV1WAv18lgbPL/fk6GcqEWDIfatQPAQrkqPJRAhhIfxftPkpgJjflclgrfH+aCI/4LFaEM6/YtILvU5BTdOX07K7kzbhJVGgMMQ9AiXIhrOsW3dxQg2ZSgJq375yf+V075M7pn7q9IIhbcWwMtecHz8VLXqPt5uhX4hSVqOXU/9PLII0ieP8yPp5Nap2cB3DafaiuzOQb2YffhSt67/4lD0DC4NAz1XZh4hAP6WWkCS87ScWHwNSHNv2lojAIAP8B0vej778uK1kD1JMVQdWZEgRq2O40sfzOjGdXcYGEzEHPLfzdyecR+ChaWUIv3D1ZtUhHTEbzUbJIo3jtetmJ2EwQZeNBFwGR/nRvCbbm2SZdGBR1i4J/ImnW04ET7tT0SNk8CmVuZHN0cmVhbQplbmRvYmoKNiAwIG9iago8PAovQ29sb3JTcGFjZSA8PAovUENTcCA3IDAgUgovUENTcGcgOCAwIFIKL1BDU3BjbXlrIDkgMCBSCi9DU3AgL0RldmljZVJHQgovQ1NwZyAvRGV2aWNlR3JheQovQ1NwY215ayAvRGV2aWNlQ01ZSwo+PgovRXh0R1N0YXRlIDw8Ci9HU2EgMTAgMCBSCj4+Ci9QYXR0ZXJuIDw8Cj4+Ci9Gb250IDw8Cj4+Ci9YT2JqZWN0IDw8Cj4+Cj4+CmVuZG9iago3IDAgb2JqClsgL1BhdHRlcm4gL0RldmljZVJHQiBdCmVuZG9iago4IDAgb2JqClsgL1BhdHRlcm4gL0RldmljZUdyYXkgXQplbmRvYmoKOSAwIG9iagpbIC9QYXR0ZXJuIC9EZXZpY2VDTVlLIF0KZW5kb2JqCjEwIDAgb2JqCjw8Ci9UeXBlIC9FeHRHU3RhdGUKL1NBIHRydWUKL1NNIDAuMDIKL2NhIDEKL0NBIDEKL0FJUyBmYWxzZQovU01hc2sgL05vbmUKPj4KZW5kb2JqCjExIDAgb2JqClsgXQplbmRvYmoKMTIgMCBvYmoKPDwKL1YgMgovUiAzCi9MZW5ndGggMTI4Ci9QIDQyOTQ5NjcyOTIKL0ZpbHRlciAvU3RhbmRhcmQKL08gPDNkODY3YzA4MWY1NDdkYjUxYTNmZTZiOGE3YTExMGYyMGU1NTlhYmYwZTY4ZWJhYWZlN2Y2MjUwNmE2ZmUxNjA+Ci9VIDw0YzhkYWU1MDIzZTVkNTk2MGZlOGExMjJjNzRmZjVmZDI4YmY0ZTVlNGU3NThhNDE2NDAwNGU1NmZmZmEwMTA4Pgo+PgplbmRvYmoKeHJlZgowIDEzCjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNSAwMDAwMCBuIAowMDAwMDAwMDU5IDAwMDAwIG4gCjAwMDAwMDAxMTggMDAwMDAgbiAKMDAwMDAwMDE2NyAwMDAwMCBuIAowMDAwMDAwMzEzIDAwMDAwIG4gCjAwMDAwMDA3NTkgMDAwMDAgbiAKMDAwMDAwMDk2NSAwMDAwMCBuIAowMDAwMDAxMDA0IDAwMDAwIG4gCjAwMDAwMDEwNDQgMDAwMDAgbiAKMDAwMDAwMTA4NCAwMDAwMCBuIAowMDAwMDAxMTc3IDAwMDAwIG4gCjAwMDAwMDExOTcgMDAwMDAgbiAKdHJhaWxlcgo8PAovU2l6ZSAxMwovUm9vdCAzIDAgUgovSW5mbyAxIDAgUgovSUQgWyA8NjEzMDYxMzg2MTMzMzY2NDMyMzkzOTYxMzQzMTMzNjQzNjMxMzkzMzYzNjQ2NTY1MzA2MTMzNjYzNzM2MzkzOT4gPDYxMzA2MTM4NjEzMzM2NjQzMjM5Mzk2MTM0MzEzMzY0MzYzMTM5MzM2MzY0NjU2NTMwNjEzMzY2MzczNjM5Mzk+IF0KL0VuY3J5cHQgMTIgMCBSCj4+CnN0YXJ0eHJlZgoxNDEzCiUlRU9GCg=="""
+
+
+def password_pdf_fixture() -> bytes:
+    """One-page standard-encryption PDF; user password is ``reader-secret``."""
+    return base64.b64decode(_PASSWORD_PDF)
+
+
+def write_pdf_fixture(path, pages: int = 1, page_mm: tuple[float, float] | None = None) -> None:
+    from PySide6.QtCore import QSizeF
+    from PySide6.QtGui import QPageSize, QPainter, QPdfWriter
+
+    writer = QPdfWriter(str(path))
+    writer.setResolution(72)
+    if page_mm:
+        writer.setPageSize(QPageSize(QSizeF(*page_mm), QPageSize.Unit.Millimeter, "Fixture"))
+    painter = QPainter(writer)
+    for index in range(pages):
+        painter.drawText(72, 72, f"ArchiveLens PDF page {index + 1}")
+        if index + 1 < pages:
+            writer.newPage()
+    painter.end()
 
 
 def pillow_image_fixture(

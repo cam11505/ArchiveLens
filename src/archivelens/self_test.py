@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import shutil
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -25,7 +26,12 @@ from PySide6.QtWidgets import QApplication
 
 from archivelens import __version__
 from archivelens.backend_self_test import check_backends
-from archivelens.diagnostic_fixtures import animated_gif, pillow_image_fixture
+from archivelens.diagnostic_fixtures import (
+    animated_gif,
+    password_pdf_fixture,
+    pillow_image_fixture,
+    write_pdf_fixture,
+)
 from archivelens.image.decoders import DEFAULT_DECODER_REGISTRY
 from archivelens.image.loader import decode_image
 from archivelens.image.media import PageMedia
@@ -114,6 +120,40 @@ class SelfTestRunner(QObject):
                 DEFAULT_DECODER_REGISTRY.supported_extensions
             )
             self.checks.append("decoder_registry_capabilities")
+            from PySide6.QtCore import QSize
+            from PySide6.QtPdf import QPdfDocument
+
+            pdf_dir = self.directory / "pdf-spike"
+            pdf_dir.mkdir()
+            ordinary_pdf = pdf_dir / "ordinary.pdf"
+            many_pdf = pdf_dir / "many.pdf"
+            huge_pdf = pdf_dir / "huge.pdf"
+            protected_pdf = pdf_dir / "protected.pdf"
+            write_pdf_fixture(ordinary_pdf)
+            write_pdf_fixture(many_pdf, 125)
+            write_pdf_fixture(huge_pdf, page_mm=(2000, 2000))
+            protected_pdf.write_bytes(password_pdf_fixture())
+            document = QPdfDocument()
+            for path, pages in ((ordinary_pdf, 1), (many_pdf, 125), (huge_pdf, 1)):
+                assert document.load(str(path)) is QPdfDocument.Error.None_
+                assert document.pageCount() == pages
+                assert document.pageLabel(0) == "1"
+                assert not document.render(0, QSize(320, 240)).isNull()
+                document.close()
+            self.checks.append("qtpdf_normal_many_large_bounded_render")
+            assert document.load(str(protected_pdf)) is QPdfDocument.Error.IncorrectPassword
+            document.setPassword("wrong")
+            assert document.load(str(protected_pdf)) is QPdfDocument.Error.IncorrectPassword
+            document.setPassword("reader-secret")
+            assert document.load(str(protected_pdf)) is QPdfDocument.Error.None_
+            assert not document.render(0, QSize(160, 160)).isNull()
+            document.close()
+            document.setPassword("")
+            assert not document.password()
+            self.checks.append("qtpdf_password_session_only")
+            del document
+            QApplication.processEvents()
+            shutil.rmtree(pdf_dir)
             self.checks.extend(check_backends(demo_image("PNG", "Backend", "#286a72")))
             self.source_hash = hashlib.sha256(self.archive.read_bytes()).hexdigest()
             self.window.activateWindow()

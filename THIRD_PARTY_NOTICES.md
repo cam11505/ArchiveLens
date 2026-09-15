@@ -10,8 +10,11 @@ their own licenses; the MIT license does not relicense Python, Qt or PySide6.
 - **Qt 6.11.2 / PySide6 6.11.2 / Shiboken6 6.11.2** — the applicable Qt/PySide
   components are used under LGPL-3.0. Qt's third-party libraries have their own
   licenses and copyright notices. The bundle includes Qt Core, Gui, Widgets,
-  Network (a PySide packaging dependency), Test (local diagnostics), platform/style
-  plugins, and JPEG/GIF/WebP/TIFF image plugins. PNG/BMP decoding is provided by Qt Gui.
+  Network (a PySide packaging dependency), Test (local diagnostics), PDF,
+  platform/style plugins, and JPEG/GIF/WebP/TIFF image plugins. PNG/BMP decoding
+  is provided by Qt Gui. Qt PDF includes PDFium and its third-party components;
+  their BSD, Apache-2.0, MIT, FTL, IJG, libpng and zlib notices are included in
+  the collected `qtpdf` source/license material.
   No application feature uses Qt Network to send data.
 - **PyInstaller bootloader** — GPL-2.0-or-later with the PyInstaller bootloader
   exception permitting distributions of applications under their own licenses.
@@ -21,7 +24,8 @@ their own licenses; the MIT license does not relicense Python, Qt or PySide6.
   distributed with Python/Qt retain Microsoft's terms. They are not MIT licensed.
 
 Full upstream license texts and attribution files are under `licenses/qtbase/`,
-`licenses/qtimageformats/`, `licenses/pyside-setup/` and `licenses/PyInstaller/`.
+`licenses/qtimageformats/`, `licenses/qtpdf/`, `licenses/pyside-setup/` and
+`licenses/PyInstaller/`.
 This collection includes notices for the upstream source trees, a superset of the
 components actually used. `licenses/upstream-sources.json` records exact source
 URLs, versions, filenames and SHA-256 hashes.
@@ -33,6 +37,7 @@ portable ZIP in the GitHub release. They are also available at:
 
 - [Qt Base v6.11.2](https://github.com/qt/qtbase/tree/v6.11.2)
 - [Qt Image Formats v6.11.2](https://github.com/qt/qtimageformats/tree/v6.11.2)
+- [Qt PDF/WebEngine source v6.11.2](https://download.qt.io/archive/qt/6.11/6.11.2/submodules/)
 - [PySide / Shiboken v6.11.2](https://github.com/pyside/pyside-setup/tree/v6.11.2)
 - [Python source](https://www.python.org/downloads/source/)
 
