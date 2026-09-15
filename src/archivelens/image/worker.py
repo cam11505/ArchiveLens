@@ -222,9 +222,13 @@ class ImageWorker(QThread):
                                 animation = data
                             if content.image is None:
                                 image = (
-                                    decode_image(data, page_request.thumbnail_size)
+                                    decode_image(
+                                        data,
+                                        page_request.thumbnail_size,
+                                        entries[page_index].extension,
+                                    )
                                     if request.thumbnail
-                                    else decode_image(data)
+                                    else decode_image(data, extension=entries[page_index].extension)
                                 )
                             if not request.thumbnail:
                                 cache.put(cache_key, image)
@@ -319,7 +323,7 @@ class ImageWorker(QThread):
                 image = (
                     content.image
                     if content.image is not None
-                    else decode_image(content.encoded or b"")
+                    else decode_image(content.encoded or b"", extension=entries[neighbor].extension)
                 )
                 # Prefetch must not evict the requested image to store a speculative neighbor.
                 if image.sizeInBytes() <= cache.max_bytes - cache.current_bytes:

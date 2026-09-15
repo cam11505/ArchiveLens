@@ -26,6 +26,7 @@ from PySide6.QtWidgets import QApplication
 from archivelens import __version__
 from archivelens.backend_self_test import check_backends
 from archivelens.diagnostic_fixtures import animated_gif
+from archivelens.image.decoders import DEFAULT_DECODER_REGISTRY
 from archivelens.image.loader import decode_image
 from archivelens.image.media import PageMedia
 from archivelens.ui.main_window import MainWindow
@@ -88,6 +89,10 @@ class SelfTestRunner(QObject):
                 base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
             )
             self.checks.append("required_image_decoders")
+            assert {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"} <= (
+                DEFAULT_DECODER_REGISTRY.supported_extensions
+            )
+            self.checks.append("decoder_registry_capabilities")
             self.checks.extend(check_backends(demo_image("PNG", "Backend", "#286a72")))
             self.source_hash = hashlib.sha256(self.archive.read_bytes()).hexdigest()
             self.window.activateWindow()

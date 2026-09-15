@@ -81,3 +81,11 @@ class ImageDecodeError(ArchiveLensError):
 
 class ImageSizeError(ResourceLimitError):
     default_message = "圖片尺寸過大，基於安全考量未載入。"
+
+
+class UnsupportedImageFormatError(ArchiveLensError):
+    default_message = "目前尚未支援此圖片格式。"
+
+
+class DecoderUnavailableError(ArchiveLensError):
+    default_message = "此圖片格式的解碼元件目前無法使用。"

@@ -162,10 +162,10 @@ def test_switch_archive_during_decode(
     release = Event()
     original = worker_module.decode_image
 
-    def delayed(data):
+    def delayed(data, *args, **kwargs):
         entered.set()
         assert release.wait(5)
-        return original(data)
+        return original(data, *args, **kwargs)
 
     other = tmp_path / "other.zip"
     with ZipFile(other, "w") as target:
@@ -190,10 +190,10 @@ def test_close_while_decode_is_active(window, archive, wait_until, monkeypatch):
     release = Event()
     original = worker_module.decode_image
 
-    def delayed(data):
+    def delayed(data, *args, **kwargs):
         entered.set()
         assert release.wait(5)
-        return original(data)
+        return original(data, *args, **kwargs)
 
     monkeypatch.setattr(worker_module, "decode_image", delayed)
     window.open_archive(archive)
