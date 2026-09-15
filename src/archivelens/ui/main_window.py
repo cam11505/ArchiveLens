@@ -63,9 +63,11 @@ class MainWindow(QMainWindow):
         self.current_index = 0
         self.source_path: Path | None = None
         self.source_identity: SourceIdentity | None = None
+        self._identity_resolved = False
         self.double_page = read_bool(self.settings, "double_page", False)
         self.rtl = read_bool(self.settings, "rtl", False)
         self.cover = read_bool(self.settings, "cover", True)
+        self.recursive_folders = read_bool(self.settings, "recursive_folders", False)
         self.view_mode = "fit_page"
         self.page_zoom_factor = 1.0
         self.page_rotation = 0
@@ -83,11 +85,14 @@ class MainWindow(QMainWindow):
         self.message.setStyleSheet("font-size: 22px; padding: 24px;")
         self.open_button = QPushButton("開啟壓縮檔")
         self.open_button.clicked.connect(self.choose_archive)
+        self.open_folder_button = QPushButton("開啟圖片資料夾")
+        self.open_folder_button.clicked.connect(self.choose_folder)
         welcome = QWidget()
         layout = QVBoxLayout(welcome)
         layout.addStretch()
         layout.addWidget(self.message)
         layout.addWidget(self.open_button, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(self.open_folder_button, alignment=Qt.AlignmentFlag.AlignHCenter)
         layout.addStretch()
         self.stack = QStackedWidget()
         self.stack.addWidget(welcome)
@@ -104,6 +109,9 @@ class MainWindow(QMainWindow):
         self.thumbnail_dock.setVisible(read_bool(self.settings, "thumbnails", False))
         self.thumbnails.worker.finished.connect(self._on_worker_finished)
         self.open_action = make_action(self, "開啟…", self.choose_archive, ["Ctrl+O"])
+        self.open_folder_action = make_action(
+            self, "開啟資料夾…", self.choose_folder, ["Ctrl+Shift+O"]
+        )
         self.previous_action = make_action(
             self, "上一張", lambda: self.navigate(-1), ["PgUp", "Backspace"]
         )
@@ -141,6 +149,7 @@ class MainWindow(QMainWindow):
             self,
             [
                 self.open_action,
+                self.open_folder_action,
                 self.previous_action,
                 self.next_action,
                 *self._viewer_actions,
@@ -149,6 +158,7 @@ class MainWindow(QMainWindow):
         )
         menu = self.menuBar().addMenu("檔案")
         menu.addAction(self.open_action)
+        menu.addAction(self.open_folder_action)
         self.recent_menu = menu.addMenu("最近閱讀")
         self.recent_menu.aboutToShow.connect(self._rebuild_recent_menu)
         menu.addSeparator()
@@ -186,6 +196,12 @@ class MainWindow(QMainWindow):
         self.cover_action.setCheckable(True)
         self.cover_action.setChecked(self.cover)
         reading_menu.addActions([self.ltr_action, self.rtl_action, self.cover_action])
+        self.recursive_action = make_action(
+            self, "資料夾包含子資料夾", self.toggle_recursive_folders, []
+        )
+        self.recursive_action.setCheckable(True)
+        self.recursive_action.setChecked(self.recursive_folders)
+        reading_menu.addAction(self.recursive_action)
         reading_menu.addSeparator()
         self.bookmark_action = make_action(
             self, "加入／移除目前頁書籤", self.toggle_current_bookmark, ["Ctrl+B"]
@@ -229,6 +245,12 @@ class MainWindow(QMainWindow):
         if path:
             self.open_archive(path)
 
+    @Slot()
+    def choose_folder(self) -> None:
+        path = QFileDialog.getExistingDirectory(self, "開啟圖片資料夾")
+        if path:
+            self.open_content(path)
+
     def open_archive(self, path: str | Path) -> None:
         self.open_content(path)
 
@@ -240,15 +262,11 @@ class MainWindow(QMainWindow):
         source_type = self.content_registry.source_type(self.source_path)
         self.source_identity = source_identity_for_path(self.source_path, source_type)
         saved = self.reading_store.get(self.source_identity)
+        self._identity_resolved = False
         self.entries = ()
         self.current_index = saved.state.page_index if saved else 0
         if saved:
-            self.double_page = saved.state.double_page
-            self.rtl = saved.state.rtl
-            self.cover = saved.state.cover
-            self.view_mode = saved.state.fit_mode
-            self.page_zoom_factor = saved.state.zoom_factor
-            self.page_rotation = saved.state.rotation
+            self._restore_record(saved)
         else:
             self.view_mode = "fit_page"
             self.page_zoom_factor = 1.0
@@ -276,6 +294,11 @@ class MainWindow(QMainWindow):
     def toggle_cover(self):
         self.cover = self.cover_action.isChecked()
         self.set_reading()
+
+    def toggle_recursive_folders(self) -> None:
+        self.recursive_folders = self.recursive_action.isChecked()
+        if self.source_path is not None and self.source_path.is_dir():
+            self.open_content(self.source_path)
 
     def _sync_reading_actions(self) -> None:
         self.single_action.setChecked(not self.double_page)
@@ -318,6 +341,7 @@ class MainWindow(QMainWindow):
                 credentials,
                 self.double_page,
                 self.cover,
+                recursive=self.recursive_folders,
             )
         )
 
@@ -328,7 +352,17 @@ class MainWindow(QMainWindow):
         self.loading = False
         self.entries = result.entries
         if result.source_identity is not None:
+            previous_identity = self.source_identity
             self.source_identity = result.source_identity
+            if not self._identity_resolved:
+                self._identity_resolved = True
+                if previous_identity != result.source_identity:
+                    saved = self.reading_store.get(result.source_identity)
+                    if saved is not None:
+                        self._restore_record(saved)
+                        self.current_index = saved.state.page_index
+                        self._request_image()
+                        return
         self.current_index = result.index if self.entries else 0
         self._update_navigation()
         if self.entries:
@@ -345,7 +379,12 @@ class MainWindow(QMainWindow):
         elif result.image is not None:
             revision, credentials = self.worker.credential_snapshot()
             self.thumbnails.set_session(
-                self.source_path, self._generation, self.entries, revision, credentials
+                self.source_path,
+                self._generation,
+                self.entries,
+                revision,
+                credentials,
+                recursive=self.recursive_folders,
             )
             self.thumbnails.setCurrentIndex(self.thumbnails.catalog.index(self.current_index))
             self.stack.setCurrentIndex(1)
@@ -476,6 +515,15 @@ class MainWindow(QMainWindow):
             ),
         )
 
+    def _restore_record(self, record: ReadingRecord) -> None:
+        self.double_page = record.state.double_page
+        self.rtl = record.state.rtl
+        self.cover = record.state.cover
+        self.view_mode = record.state.fit_mode
+        self.page_zoom_factor = record.state.zoom_factor
+        self.page_rotation = record.state.rotation
+        self._sync_reading_actions()
+
     def toggle_current_bookmark(self) -> None:
         if not self.entries or self.source_identity is None:
             return
@@ -569,7 +617,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "操作說明",
-            f"Ctrl+O：開啟 {self.registry.format_label()}\n"
+            f"Ctrl+O：開啟 {self.registry.format_label()}；Ctrl+Shift+O：開啟資料夾\n"
             "← / →：依閱讀方向翻頁；PageUp / PageDown：上一頁 / 下一頁\n"
             "Backspace / Space：上一張 / 下一張\nHome / End：第一張 / 最後一張\n"
             "+ / = / -：縮放　0：符合視窗　1：100%\n"
@@ -595,7 +643,7 @@ class MainWindow(QMainWindow):
         urls = event.mimeData().urls()
         if len(urls) == 1 and urls[0].isLocalFile():
             path = Path(urls[0].toLocalFile())
-            if self.registry.supports(path):
+            if self.content_registry.supports(path):
                 return path
         return None
 
@@ -629,6 +677,7 @@ class MainWindow(QMainWindow):
                 ("double_page", self.double_page),
                 ("rtl", self.rtl),
                 ("cover", self.cover),
+                ("recursive_folders", self.recursive_folders),
                 ("thumbnails", self.thumbnail_dock.isVisible()),
             ):
                 self.settings.setValue(key, value)

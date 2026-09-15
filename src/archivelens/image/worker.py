@@ -10,13 +10,14 @@ from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
 from archivelens.config import MAX_ANIMATION_BYTES, PREFETCH_OFFSETS, THUMBNAIL_SIZE
 from archivelens.content.base import (
+    ContentOpenOptions,
     ContentProvider,
     PageDescriptor,
     PageLoadRequest,
     SourceIdentity,
 )
 from archivelens.content.factory import ContentProviderRegistry, create_content_registry
-from archivelens.errors import ArchiveLensError, EmptyArchiveError, ResourceLimitError
+from archivelens.errors import ArchiveLensError, EmptyContentError, ResourceLimitError
 from archivelens.image.cache import ImageCache
 from archivelens.image.loader import decode_image
 from archivelens.image.media import PageMedia
@@ -35,6 +36,7 @@ class LoadRequest:
     double_page: bool = False
     cover: bool = True
     thumbnail: bool = False
+    recursive: bool = False
 
 
 @dataclass(frozen=True)
@@ -172,13 +174,22 @@ class ImageWorker(QThread):
                             self._close_provider(provider)
                         provider = None
                         provider = self.content_registry.create(request.path)
-                        provider.open(request.path, credentials=request.credentials)
+                        provider.open(
+                            request.path,
+                            credentials=request.credentials,
+                            options=ContentOpenOptions(
+                                recursive=request.recursive,
+                                cancelled=lambda revision=request_revision: self._request_cancelled(
+                                    revision
+                                ),
+                            ),
+                        )
                         entries = tuple(provider.list_pages())
                         revision = request_revision
                     assert provider is not None
                     source_identity = provider.source_identity
                     if not entries:
-                        raise EmptyArchiveError()
+                        raise EmptyContentError()
                     indices = spread_indices(
                         index, len(entries), request.double_page, request.cover
                     )
@@ -273,6 +284,15 @@ class ImageWorker(QThread):
         except Exception:
             # Backend exceptions may contain credentials, including during cleanup.
             logger.error("Archive provider cleanup failed")
+
+    def _request_cancelled(self, revision: int) -> bool:
+        with self._condition:
+            return (
+                self._stopping
+                or self._reset_pending
+                or self._pending is not None
+                or revision != self._credential_revision
+            )
 
     def _prefetch(
         self,

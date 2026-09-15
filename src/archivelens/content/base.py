@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -84,6 +85,12 @@ class PageLoadRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class ContentOpenOptions:
+    recursive: bool = False
+    cancelled: Callable[[], bool] = field(default=lambda: False, repr=False, compare=False)
+
+
+@dataclass(frozen=True, slots=True)
 class ContentPage:
     """A page is either encoded raster bytes or an already-rendered image."""
 
@@ -114,7 +121,13 @@ class ContentProvider(ABC):
     def source_identity(self) -> SourceIdentity: ...
 
     @abstractmethod
-    def open(self, path: str | Path, *, credentials: ArchiveCredentials | None = None) -> None: ...
+    def open(
+        self,
+        path: str | Path,
+        *,
+        credentials: ArchiveCredentials | None = None,
+        options: ContentOpenOptions | None = None,
+    ) -> None: ...
 
     @abstractmethod
     def close(self) -> None: ...

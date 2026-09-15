@@ -3,7 +3,8 @@ from pathlib import Path
 from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
 from archivelens.content.archive_provider import ArchiveContentProvider
 from archivelens.content.base import ContentProvider, SourceType
-from archivelens.errors import UnsupportedArchiveError
+from archivelens.content.folder_provider import FolderContentProvider
+from archivelens.errors import UnsupportedArchiveError, UnsupportedContentError
 
 
 class ContentProviderRegistry:
@@ -17,23 +18,30 @@ class ContentProviderRegistry:
         return self.archive_registry.supported_extensions
 
     def supports(self, path: str | Path) -> bool:
-        return self.archive_registry.supports(path)
+        source = Path(path)
+        return source.is_dir() or self.archive_registry.supports(source)
 
     def source_type(self, path: str | Path) -> SourceType:
-        if Path(path).suffix.casefold() not in self.archive_registry.registered_extensions:
+        source = Path(path)
+        if source.is_dir():
+            return SourceType.FOLDER
+        if source.suffix.casefold() not in self.archive_registry.registered_extensions:
             raise UnsupportedArchiveError()
         return SourceType.ARCHIVE
 
     def create(self, path: str | Path) -> ContentProvider:
-        if Path(path).suffix.casefold() not in self.archive_registry.registered_extensions:
-            raise UnsupportedArchiveError()
+        source = Path(path)
+        if source.is_dir():
+            return FolderContentProvider()
+        if source.suffix.casefold() not in self.archive_registry.registered_extensions:
+            raise UnsupportedContentError()
         return ArchiveContentProvider(self.archive_registry)
 
     def file_dialog_filter(self) -> str:
         return self.archive_registry.file_dialog_filter()
 
     def format_label(self) -> str:
-        return self.archive_registry.format_label()
+        return f"{self.archive_registry.format_label()} 或圖片資料夾"
 
 
 def create_content_registry(

@@ -19,7 +19,7 @@ from archivelens.content.base import (
     SourceType,
 )
 from archivelens.content.factory import create_content_registry
-from archivelens.errors import ArchiveNotOpenError, InvalidArchiveEntryError
+from archivelens.errors import ArchiveNotOpenError, InvalidPageError
 from archivelens.image.worker import ImageWorker, LoadRequest, PageCacheKey
 
 
@@ -46,7 +46,7 @@ def test_archive_content_provider_descriptors_and_lifecycle(tmp_path, image_byte
     assert provider.load_page(pages[0], PageLoadRequest()).encoded == image_bytes("green")
 
     copied = PageDescriptor(**{field: getattr(pages[0], field) for field in pages[0].__slots__})
-    with pytest.raises(InvalidArchiveEntryError):
+    with pytest.raises(InvalidPageError):
         provider.load_page(copied, PageLoadRequest())
     provider.close()
     with pytest.raises(ArchiveNotOpenError):
@@ -84,7 +84,7 @@ class RenderedContentProvider(ContentProvider):
             raise ArchiveNotOpenError()
         return self._identity
 
-    def open(self, path, *, credentials=None):
+    def open(self, path, *, credentials=None, options=None):
         self._open = True
 
     def close(self):

@@ -51,8 +51,28 @@ class InvalidArchiveEntryError(ArchiveLensError):
     default_message = "圖片項目已失效，請重新開啟壓縮檔。"
 
 
+class InvalidPageError(InvalidArchiveEntryError):
+    default_message = "頁面項目已失效，請重新開啟內容來源。"
+
+
 class EmptyArchiveError(ArchiveLensError):
     default_message = "此壓縮檔中沒有找到可顯示的圖片。"
+
+
+class EmptyContentError(ArchiveLensError):
+    default_message = "此來源中沒有找到可顯示的圖片。"
+
+
+class ContentAccessError(ArchiveLensError):
+    default_message = "無法開啟或讀取內容來源：路徑不存在或沒有讀取權限。"
+
+
+class ContentScanCancelledError(ArchiveLensError):
+    default_message = "內容掃描已取消。"
+
+
+class UnsupportedContentError(ArchiveLensError):
+    default_message = "目前尚未支援此內容來源。"
 
 
 class ImageDecodeError(ArchiveLensError):

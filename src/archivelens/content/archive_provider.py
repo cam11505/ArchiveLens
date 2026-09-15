@@ -6,6 +6,7 @@ from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import ArchiveProviderRegistry
 from archivelens.content.base import (
     ContentCapabilities,
+    ContentOpenOptions,
     ContentPage,
     ContentProvider,
     PageDescriptor,
@@ -15,7 +16,7 @@ from archivelens.content.base import (
     SourceType,
     source_identity_for_path,
 )
-from archivelens.errors import ArchiveNotOpenError, InvalidArchiveEntryError
+from archivelens.errors import ArchiveNotOpenError, InvalidPageError
 
 
 class ArchiveContentProvider(ContentProvider):
@@ -43,7 +44,14 @@ class ArchiveContentProvider(ContentProvider):
             raise ArchiveNotOpenError()
         return self._identity
 
-    def open(self, path: str | Path, *, credentials: ArchiveCredentials | None = None) -> None:
+    def open(
+        self,
+        path: str | Path,
+        *,
+        credentials: ArchiveCredentials | None = None,
+        options: ContentOpenOptions | None = None,
+    ) -> None:
+        del options
         self.close()
         source = Path(path)
         provider = self._registry.create(source)
@@ -90,5 +98,5 @@ class ArchiveContentProvider(ContentProvider):
         if self._provider is None:
             raise ArchiveNotOpenError()
         if not 0 <= page.index < len(self._pages) or self._pages[page.index] is not page:
-            raise InvalidArchiveEntryError()
+            raise InvalidPageError()
         return ContentPage(encoded=self._provider.read_entry(self._entries[page.index]))

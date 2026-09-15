@@ -66,6 +66,7 @@ class ThumbnailSidebar(QListView):
         self._credentials = None
         self._requested = None
         self._failed = set()
+        self.recursive = False
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(40)
@@ -86,12 +87,13 @@ class ThumbnailSidebar(QListView):
         self.worker.cancel_session()
         self.catalog.reset_entries(())
 
-    def set_session(self, path, generation, entries, revision, credentials):
+    def set_session(self, path, generation, entries, revision, credentials, *, recursive=False):
         if self.path == path and self.generation == generation and self.revision == revision:
             credentials.clear()
             return
         self.reset_session()
         self.path, self.generation, self.revision = path, generation, revision
+        self.recursive = recursive
         self._credentials = credentials
         self.catalog.reset_entries(entries)
         self._timer.start()
@@ -124,7 +126,15 @@ class ThumbnailSidebar(QListView):
         self._requested = row
         credentials, self._credentials = self._credentials, None
         self.worker.submit(
-            LoadRequest(self.token, self.generation, self.path, row, credentials, thumbnail=True)
+            LoadRequest(
+                self.token,
+                self.generation,
+                self.path,
+                row,
+                credentials,
+                thumbnail=True,
+                recursive=self.recursive,
+            )
         )
 
     def _result(self, result):

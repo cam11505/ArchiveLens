@@ -3,6 +3,7 @@
 from archivelens.content.archive_provider import ArchiveContentProvider
 from archivelens.content.base import (
     ContentCapabilities,
+    ContentOpenOptions,
     ContentPage,
     ContentProvider,
     PageDescriptor,
@@ -13,13 +14,16 @@ from archivelens.content.base import (
     source_identity_for_path,
 )
 from archivelens.content.factory import ContentProviderRegistry, create_content_registry
+from archivelens.content.folder_provider import FolderContentProvider
 
 __all__ = [
     "ArchiveContentProvider",
     "ContentCapabilities",
+    "ContentOpenOptions",
     "ContentPage",
     "ContentProvider",
     "ContentProviderRegistry",
+    "FolderContentProvider",
     "PageDescriptor",
     "PageLoadRequest",
     "PageMediaKind",

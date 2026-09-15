@@ -12,8 +12,8 @@ from archivelens.ui.main_window import MainWindow
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="ArchiveLens ZIP / CBZ image viewer")
-    parser.add_argument("archive", nargs="?")
+    parser = argparse.ArgumentParser(description="ArchiveLens local image and document reader")
+    parser.add_argument("source", nargs="?")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--version", action="version", version=f"ArchiveLens {__version__}")
     parser.add_argument("--self-test-report", type=Path, help="Run GUI diagnostics and write JSON")
@@ -51,8 +51,8 @@ def main() -> int:
         app.exec()
         runner.cleanup()
         return runner.exit_code
-    if args.archive:
-        window.open_archive(args.archive)
+    if args.source:
+        window.open_content(args.source)
     return app.exec()
 
 

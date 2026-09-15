@@ -90,6 +90,7 @@ def test_gif_spread_rtl_thumbnails_settings(tmp_path, image_bytes, wait_until, q
         "double_page",
         "rtl",
         "cover",
+        "recursive_folders",
         "thumbnails",
     }
     restored = MainWindow(settings=settings)
