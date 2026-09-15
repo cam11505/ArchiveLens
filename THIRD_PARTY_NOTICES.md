@@ -11,7 +11,7 @@ their own licenses; the MIT license does not relicense Python, Qt or PySide6.
   components are used under LGPL-3.0. Qt's third-party libraries have their own
   licenses and copyright notices. The bundle includes Qt Core, Gui, Widgets,
   Network (a PySide packaging dependency), Test (local diagnostics), platform/style
-  plugins, and JPEG/GIF/WebP image plugins. PNG/BMP decoding is provided by Qt Gui.
+  plugins, and JPEG/GIF/WebP/TIFF image plugins. PNG/BMP decoding is provided by Qt Gui.
   No application feature uses Qt Network to send data.
 - **PyInstaller bootloader** — GPL-2.0-or-later with the PyInstaller bootloader
   exception permitting distributions of applications under their own licenses.
@@ -67,3 +67,15 @@ ArchiveLens permits reverse engineering for debugging modifications to LGPL
 libraries. Its MIT source and build scripts allow rebuilding with modified versions;
 compatible native libraries can also be replaced in the installed `_internal` folder.
 See [backend decisions](docs/BACKENDS.md) for provenance and limitations.
+
+## Image backend added in 1.2
+
+- **Pillow 12.3.0** — HPND license. Its Windows wheel supplies the AVIF and
+  JPEG 2000/OpenJPEG decoding used by ArchiveLens. Exact license files and the
+  corresponding source distribution are included with release artifacts.
+- TIFF decoding uses Qt's dynamically loaded `qtiff.dll` under the Qt terms above.
+- HEIC/HEIF and JPEG XL are not bundled or supported in v1.2; candidate backends
+  did not pass the documented license, preflight, or package-size gates.
+
+See [image backend decisions](docs/IMAGE_BACKENDS.md) for the tested scope and
+explicitly deferred formats.

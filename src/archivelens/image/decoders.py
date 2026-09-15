@@ -1,8 +1,9 @@
+import io
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QSize, Qt
-from PySide6.QtGui import QImage, QImageReader
+from PySide6.QtGui import QColorSpace, QImage, QImageReader
 
 from archivelens import config
 from archivelens.errors import (
@@ -50,7 +51,7 @@ class QtImageDecoder(ImageDecoder):
     capabilities = DecoderCapabilities(
         "Qt raster",
         "PySide6.QtGui.QImageReader",
-        frozenset({".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}),
+        frozenset({".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tif", ".tiff"}),
         frozenset({".gif"}),
     )
     _format_aliases = {
@@ -60,6 +61,8 @@ class QtImageDecoder(ImageDecoder):
         ".webp": frozenset({"webp"}),
         ".bmp": frozenset({"bmp"}),
         ".gif": frozenset({"gif"}),
+        ".tif": frozenset({"tif", "tiff"}),
+        ".tiff": frozenset({"tif", "tiff"}),
     }
 
     @property
@@ -111,6 +114,92 @@ class QtImageDecoder(ImageDecoder):
         reader = QImageReader(buffer)
         reader.setDecideFormatFromContent(True)
         return reader, buffer
+
+
+class PillowImageDecoder(ImageDecoder):
+    """Static AVIF/JPEG 2000 decoder using Pillow's tested Windows wheels."""
+
+    capabilities = DecoderCapabilities(
+        "Pillow raster",
+        "Pillow",
+        frozenset({".avif", ".jp2", ".j2k", ".j2c"}),
+    )
+    _format_extensions = {
+        "AVIF": frozenset({".avif"}),
+        "JPEG2000": frozenset({".jp2", ".j2k", ".j2c"}),
+    }
+
+    @property
+    def available_extensions(self) -> frozenset[str]:
+        try:
+            from PIL import features
+        except ImportError:
+            return frozenset()
+        available = set()
+        if features.check("avif"):
+            available.update(self._format_extensions["AVIF"])
+        if features.check("jpg_2000"):
+            available.update(self._format_extensions["JPEG2000"])
+        return frozenset(available)
+
+    def can_decode(self, data: bytes) -> bool:
+        try:
+            from PIL import Image
+        except ImportError:
+            return False
+        try:
+            with Image.open(io.BytesIO(data)) as image:
+                return image.format in self._format_extensions
+        except (Image.DecompressionBombError, OSError, SyntaxError, ValueError):
+            return False
+
+    def decode(self, data: bytes, thumbnail_size: int | None = None) -> QImage:
+        try:
+            from PIL import Image, ImageOps
+        except ImportError as exc:
+            raise DecoderUnavailableError() from exc
+        try:
+            with Image.open(io.BytesIO(data)) as source:
+                self._guard_size(*source.size)
+                image = ImageOps.exif_transpose(source)
+                self._guard_size(*image.size)
+                if thumbnail_size:
+                    image.thumbnail((thumbnail_size, thumbnail_size), Image.Resampling.LANCZOS)
+                has_alpha = image.mode in {"RGBA", "LA"} or "transparency" in image.info
+                image = image.convert("RGBA" if has_alpha else "RGB")
+                self._guard_size(*image.size)
+                raw = image.tobytes()
+                qt_format = (
+                    QImage.Format.Format_RGBA8888
+                    if has_alpha
+                    else QImage.Format.Format_RGB888
+                )
+                result = QImage(
+                    raw,
+                    image.width,
+                    image.height,
+                    image.width * len(image.getbands()),
+                    qt_format,
+                ).copy()
+                icc_profile = source.info.get("icc_profile") or image.info.get("icc_profile")
+                if icc_profile:
+                    color_space = QColorSpace.fromIccProfile(QByteArray(icc_profile))
+                    if color_space.isValid():
+                        result.setColorSpace(color_space)
+                if result.isNull():
+                    raise ImageDecodeError()
+                return result
+        except ImageSizeError:
+            raise
+        except (Image.DecompressionBombError, MemoryError) as exc:
+            raise ImageSizeError() from exc
+        except (OSError, SyntaxError, ValueError, RuntimeError) as exc:
+            raise ImageDecodeError() from exc
+
+    @staticmethod
+    def _guard_size(width: int, height: int) -> None:
+        if width <= 0 or height <= 0 or width * height > config.MAX_IMAGE_PIXELS:
+            raise ImageSizeError()
 
 
 class DecoderRegistry:
@@ -175,3 +264,4 @@ class DecoderRegistry:
 
 DEFAULT_DECODER_REGISTRY = DecoderRegistry()
 DEFAULT_DECODER_REGISTRY.register(QtImageDecoder())
+DEFAULT_DECODER_REGISTRY.register(PillowImageDecoder())

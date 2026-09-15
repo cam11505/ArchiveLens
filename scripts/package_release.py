@@ -60,6 +60,7 @@ def main() -> int:
             name: importlib.metadata.version(name)
             for name in [
                 "PySide6",
+                "Pillow",
                 "shiboken6",
                 "pyinstaller",
                 "pyzipper",

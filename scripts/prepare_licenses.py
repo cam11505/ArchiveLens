@@ -94,6 +94,7 @@ def main() -> int:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, target)
     backend_names = [
+        "Pillow",
         "pyzipper",
         "pycryptodomex",
         "py7zr",

@@ -5,6 +5,30 @@ import struct
 import zipfile
 
 
+def pillow_image_fixture(
+    fmt: str,
+    *,
+    size: tuple[int, int] = (8, 6),
+    alpha: int = 127,
+    orientation: int | None = None,
+    icc_profile: bytes | None = None,
+) -> bytes:
+    """Create a tiny codec fixture without adding binary test assets."""
+    from PIL import Image
+
+    image = Image.new("RGBA", size, (32, 96, 192, alpha))
+    options = {}
+    if orientation is not None:
+        exif = Image.Exif()
+        exif[274] = orientation
+        options["exif"] = exif
+    if icc_profile is not None:
+        options["icc_profile"] = icc_profile
+    stream = io.BytesIO()
+    image.save(stream, fmt, **options)
+    return stream.getvalue()
+
+
 def animated_gif():
     header = b"GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\x00\x00\x00\xff\x00"
     loop = b"\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00"

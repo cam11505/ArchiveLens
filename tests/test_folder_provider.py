@@ -57,6 +57,24 @@ def test_flat_and_recursive_natural_unicode_discovery(tmp_path, image_bytes):
     assert inventory(root) == before
 
 
+def test_folder_provider_discovers_v12_codec_extensions(tmp_path):
+    from archivelens.diagnostic_fixtures import pillow_image_fixture
+    from archivelens.image.loader import decode_image
+
+    root = tmp_path / "新格式"
+    root.mkdir()
+    for name, fmt in (("1.avif", "AVIF"), ("2.jp2", "JPEG2000"), ("3.tiff", "TIFF")):
+        write_image(root / name, pillow_image_fixture(fmt))
+    write_image(root / "unsupported.heic", b"not supported")
+    provider = FolderContentProvider()
+    provider.open(root)
+    pages = provider.list_pages()
+    assert [page.path for page in pages] == ["1.avif", "2.jp2", "3.tiff"]
+    for page in pages:
+        content = provider.load_page(page, PageLoadRequest())
+        assert decode_image(content.encoded, extension=page.extension).size().toTuple() == (8, 6)
+
+
 def test_folder_entry_depth_and_file_size_limits(tmp_path, image_bytes, monkeypatch):
     root = tmp_path / "root"
     write_image(root / "1.png", image_bytes())

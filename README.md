@@ -7,7 +7,8 @@ Open images without extracting an archive into a folder. No telemetry or cloud s
 
 ## Features
 
-- JPG/JPEG, PNG, WebP, BMP, static and animated GIF; EXIF orientation.
+- JPG/JPEG, PNG, WebP, BMP, TIFF (first frame), AVIF, JPEG 2000 and static/animated
+  GIF; EXIF orientation where present.
 - Plain and ZipCrypto/AES ZIP (128/192/256), encrypted 7Z, encrypted RAR4/RAR5.
 - Masked password dialog with show-password, retry and Cancel; memory-only credentials.
 - Natural page ordering, fit, physical-pixel 100%, zoom, rotation, pan and fullscreen.
@@ -34,6 +35,10 @@ python -m venv .venv
 `prepare_backends.py` downloads and verifies the official UnRAR 7.21 SDK on Windows.
 ZIP/7Z source use is cross-platform; RAR requires the bundled Windows DLL.
 `python -m archivelens.cli book.cbz` lists images; the CLI does not prompt for passwords.
+
+HEIC/HEIF and JPEG XL (JXL) are not supported in v1.2 because the evaluated
+Windows backends did not pass the documented licensing, resource-preflight or
+package-size gates. See [image backend decisions](docs/IMAGE_BACKENDS.md).
 
 ## Controls
 

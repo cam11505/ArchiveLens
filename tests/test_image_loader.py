@@ -1,4 +1,5 @@
 import base64
+import io
 import struct
 
 import pytest
@@ -14,6 +15,7 @@ from archivelens.image.decoders import (
     DecoderCapabilities,
     DecoderRegistry,
     ImageDecoder,
+    PillowImageDecoder,
     QtImageDecoder,
 )
 from archivelens.image.loader import decode_image
@@ -100,3 +102,67 @@ def test_decoder_registry_selection_duplicates_and_unavailable():
     unavailable.register(FakeDecoder(available=False))
     with pytest.raises(DecoderUnavailableError):
         unavailable.decode(b"fake", extension=".fake")
+
+
+def pillow_fixture(fmt, *, orientation=None, icc_profile=None):
+    from PIL import Image
+
+    image = Image.new("RGBA", (8, 6), (20, 80, 160, 96))
+    options = {}
+    if orientation:
+        exif = Image.Exif()
+        exif[274] = orientation
+        options["exif"] = exif
+    if icc_profile:
+        options["icc_profile"] = icc_profile
+    stream = io.BytesIO()
+    image.save(stream, fmt, **options)
+    return stream.getvalue()
+
+
+@pytest.mark.parametrize(
+    "fmt,extension",
+    [("AVIF", ".avif"), ("JPEG2000", ".jp2"), ("JPEG2000", ".j2k"), ("TIFF", ".tiff")],
+)
+def test_v12_static_codecs_decode_in_memory(fmt, extension, qapp):
+    image = decode_image(pillow_fixture(fmt), extension=extension)
+    assert image.size().toTuple() == (8, 6)
+    assert image.hasAlphaChannel()
+
+
+def test_avif_exif_orientation_icc_and_thumbnail(qapp):
+    from PIL import ImageCms
+
+    profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    data = pillow_fixture("AVIF", orientation=6, icc_profile=profile)
+    image = decode_image(data, extension=".avif")
+    thumbnail = decode_image(data, thumbnail_size=4, extension=".avif")
+    assert image.size().toTuple() == (6, 8)
+    assert image.colorSpace().isValid()
+    assert max(thumbnail.width(), thumbnail.height()) == 4
+
+
+@pytest.mark.parametrize("extension", [".avif", ".jp2", ".tiff"])
+def test_v12_codec_malformed_input_is_recoverable(extension, qapp):
+    with pytest.raises(ArchiveLensError):
+        decode_image(b"malformed codec input", extension=extension)
+
+
+def test_pillow_size_guard_runs_before_pixel_decode(monkeypatch, qapp):
+    monkeypatch.setattr(config, "MAX_IMAGE_PIXELS", 10)
+    with pytest.raises(ArchiveLensError, match="尺寸過大"):
+        decode_image(pillow_fixture("AVIF"), extension=".avif")
+
+
+def test_pillow_decoder_capabilities_and_missing_backend(monkeypatch):
+    decoder = PillowImageDecoder()
+    assert {".avif", ".jp2", ".j2k", ".j2c"} <= decoder.available_extensions
+    registry = DecoderRegistry()
+    registry.register(decoder)
+    monkeypatch.setattr(
+        PillowImageDecoder,
+        "available_extensions",
+        property(lambda self: frozenset()),
+    )
+    with pytest.raises(DecoderUnavailableError):
+        registry.decode(b"anything", extension=".avif")

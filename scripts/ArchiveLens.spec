@@ -8,7 +8,7 @@ a = Analysis(
     pathex=[str(root / "src")],
     binaries=[(str(root / "outputs/backends/UnRAR64.dll"), "native")],
     datas=[(str(root / "tests/fixtures/rar"), "self-test-rar")],
-    hiddenimports=[],
+    hiddenimports=["PIL.AvifImagePlugin", "PIL.Jpeg2KImagePlugin"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -16,7 +16,7 @@ a = Analysis(
               "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets"],
     noarchive=False,
 )
-allowed_images = {"qjpeg.dll", "qgif.dll", "qwebp.dll"}
+allowed_images = {"qjpeg.dll", "qgif.dll", "qwebp.dll", "qtiff.dll"}
 def required_binary(item):
     name = item[0].replace("\\", "/").lower()
     if any(part in name for part in ("virtualkeyboard", "qt6qml", "qt6quick")):

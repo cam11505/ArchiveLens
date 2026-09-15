@@ -1,6 +1,21 @@
 from pathlib import PurePosixPath
 
-IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"})
+IMAGE_EXTENSIONS = frozenset(
+    {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".bmp",
+        ".gif",
+        ".tif",
+        ".tiff",
+        ".avif",
+        ".jp2",
+        ".j2k",
+        ".j2c",
+    }
+)
 ARCHIVE_EXTENSIONS = frozenset({".zip", ".cbz"})
 
 

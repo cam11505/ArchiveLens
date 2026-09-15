@@ -25,7 +25,7 @@ from PySide6.QtWidgets import QApplication
 
 from archivelens import __version__
 from archivelens.backend_self_test import check_backends
-from archivelens.diagnostic_fixtures import animated_gif
+from archivelens.diagnostic_fixtures import animated_gif, pillow_image_fixture
 from archivelens.image.decoders import DEFAULT_DECODER_REGISTRY
 from archivelens.image.loader import decode_image
 from archivelens.image.media import PageMedia
@@ -88,8 +88,29 @@ class SelfTestRunner(QObject):
             decode_image(
                 base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
             )
+            for fmt, extension in (
+                ("AVIF", ".avif"),
+                ("JPEG2000", ".jp2"),
+                ("TIFF", ".tiff"),
+            ):
+                decoded = decode_image(pillow_image_fixture(fmt), extension=extension)
+                assert decoded.size().toTuple() == (8, 6)
+            self.checks.append("v12_avif_jp2_tiff_decoders")
             self.checks.append("required_image_decoders")
-            assert {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"} <= (
+            assert {
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".bmp",
+                ".gif",
+                ".tif",
+                ".tiff",
+                ".avif",
+                ".jp2",
+                ".j2k",
+                ".j2c",
+            } <= (
                 DEFAULT_DECODER_REGISTRY.supported_extensions
             )
             self.checks.append("decoder_registry_capabilities")

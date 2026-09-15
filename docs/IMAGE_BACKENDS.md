@@ -42,7 +42,8 @@ license requirements. Do not silently substitute either rejected wheel.
 - An in-memory 8 x 6 RGBA TIFF decoded with alpha.
 - A 25% truncated fixture returned a null image with `Unable to read image data`.
 - Qt Image Formats documents bundled libtiff and LGPL/commercial deployment terms.
-- `scripts/ArchiveLens.spec` must add `qtiff.dll` in issue #26.
+- `scripts/ArchiveLens.spec` includes `qtiff.dll`; the packaged self-test decoded
+  TIFF successfully with Python removed from `PATH`.
 
 ### Pillow 12.3.0
 
@@ -101,4 +102,11 @@ systems, so Qt is not a packaged Windows fallback.
 - pillow-jxl-plugin source: <https://github.com/Isotr0py/pillow-jpegxl-plugin>
 - imagecodecs source: <https://github.com/cgohlke/imagecodecs>
 
-Exact notices/source archives are integrated by #26/#30, not by the spike alone.
+Issue #26 produced a complete development package containing 499 files and
+121,263,209 uncompressed bytes; its manifest-backed ZIP was 49,498,060 bytes.
+`verify_release.py --run --allow-development` passed with a `PATH` limited to
+Windows system directories and decoded AVIF, JP2 and TIFF. The inventory contains
+Pillow `_avif`/`_imaging`, Qt `qtiff.dll`, Pillow's license, and the verified
+`pillow-12.3.0.tar.gz` source (SHA-256
+`3b8182a766685eaa002637e28b4ec8d6b18819a0c71f579bf0dbaa5830297cce`).
+Release hardening in #30 will repeat this against the final clean v1.2 commit.

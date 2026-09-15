@@ -22,6 +22,7 @@ def create_portable(path, corrupt=False, development=False):
             "_internal/PySide6/plugins/imageformats/qjpeg.dll",
             "_internal/PySide6/plugins/imageformats/qgif.dll",
             "_internal/PySide6/plugins/imageformats/qwebp.dll",
+            "_internal/PySide6/plugins/imageformats/qtiff.dll",
         ]
     }
     files["build-info.json"] = json.dumps(

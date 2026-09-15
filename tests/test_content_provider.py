@@ -20,7 +20,26 @@ from archivelens.content.base import (
 )
 from archivelens.content.factory import create_content_registry
 from archivelens.errors import ArchiveNotOpenError, InvalidPageError
+from archivelens.image.loader import decode_image
 from archivelens.image.worker import ImageWorker, LoadRequest, PageCacheKey
+
+
+@pytest.mark.parametrize(
+    "fmt,extension",
+    [("AVIF", ".avif"), ("JPEG2000", ".jp2"), ("TIFF", ".tiff")],
+)
+def test_archive_content_provider_loads_v12_codecs(tmp_path, fmt, extension):
+    from archivelens.diagnostic_fixtures import pillow_image_fixture
+
+    source = tmp_path / "新格式.cbz"
+    encoded = pillow_image_fixture(fmt)
+    with ZipFile(source, "w") as archive:
+        archive.writestr("page" + extension, encoded)
+    provider = ArchiveContentProvider(DEFAULT_REGISTRY)
+    provider.open(source)
+    page = provider.list_pages()[0]
+    content = provider.load_page(page, PageLoadRequest())
+    assert decode_image(content.encoded, extension=page.extension).size().toTuple() == (8, 6)
 
 
 def test_archive_content_provider_descriptors_and_lifecycle(tmp_path, image_bytes):
