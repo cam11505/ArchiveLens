@@ -18,11 +18,17 @@ from PySide6.QtWidgets import (
 from archivelens import __version__
 from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
-from archivelens.content.base import PageDescriptor
+from archivelens.content.base import PageDescriptor, SourceIdentity, source_identity_for_path
 from archivelens.content.factory import create_content_registry
 from archivelens.errors import BadPasswordError, PasswordRequiredError
 from archivelens.image.reading import spread_indices
 from archivelens.image.worker import ImageWorker, LoadRequest, LoadResult
+from archivelens.reading_state import (
+    ReaderState,
+    ReadingRecord,
+    ReadingStateStore,
+    create_reading_state_store,
+)
 from archivelens.ui.image_viewer import ImageViewer
 from archivelens.ui.password_dialog import PasswordDialog
 from archivelens.ui.settings import create_settings, read_bool
@@ -33,11 +39,20 @@ from archivelens.ui.toolbar import make_action, make_toolbar
 class MainWindow(QMainWindow):
     """Open content sources, navigate pages and present only the latest load result."""
 
-    def __init__(self, *, registry: ArchiveProviderRegistry | None = None, settings=None) -> None:
+    def __init__(
+        self,
+        *,
+        registry: ArchiveProviderRegistry | None = None,
+        settings=None,
+        reading_store: ReadingStateStore | None = None,
+    ) -> None:
         super().__init__()
         self.settings = create_settings() if settings is None else settings
         self.registry = DEFAULT_REGISTRY if registry is None else registry
         self.content_registry = create_content_registry(self.registry)
+        self.reading_store = (
+            create_reading_state_store(self.settings) if reading_store is None else reading_store
+        )
         self.setWindowTitle("ArchiveLens")
         self.resize(1100, 780)
         self.setWindowIcon(
@@ -47,9 +62,14 @@ class MainWindow(QMainWindow):
         self.entries: tuple[PageDescriptor, ...] = ()
         self.current_index = 0
         self.source_path: Path | None = None
+        self.source_identity: SourceIdentity | None = None
         self.double_page = read_bool(self.settings, "double_page", False)
         self.rtl = read_bool(self.settings, "rtl", False)
         self.cover = read_bool(self.settings, "cover", True)
+        self.view_mode = "fit_page"
+        self.page_zoom_factor = 1.0
+        self.page_rotation = 0
+        self._applying_reader_state = False
         self.loading = False
         self._token = 0
         self._generation = 0
@@ -96,15 +116,15 @@ class MainWindow(QMainWindow):
         self.last_action = make_action(
             self, "最後一張", lambda: self.go_to(len(self.entries) - 1), ["End"]
         )
-        self.fit_action = make_action(self, "符合視窗", self.viewer.fit_image, ["0"])
-        self.zoom_out_action = make_action(self, "縮小", self.viewer.zoom_out, ["-"])
-        self.zoom_in_action = make_action(self, "放大", self.viewer.zoom_in, ["+", "="])
-        self.actual_action = make_action(self, "100%", self.viewer.actual_size, ["1"])
+        self.fit_action = make_action(self, "符合視窗", self.fit_current, ["0"])
+        self.zoom_out_action = make_action(self, "縮小", lambda: self.zoom_current(False), ["-"])
+        self.zoom_in_action = make_action(self, "放大", lambda: self.zoom_current(True), ["+", "="])
+        self.actual_action = make_action(self, "100%", self.actual_current, ["1"])
         self.rotate_left_action = make_action(
-            self, "向左旋轉", lambda: self.viewer.rotate_image(-90), ["Shift+R"]
+            self, "向左旋轉", lambda: self.rotate_current(-90), ["Shift+R"]
         )
         self.rotate_right_action = make_action(
-            self, "向右旋轉", lambda: self.viewer.rotate_image(90), ["R"]
+            self, "向右旋轉", lambda: self.rotate_current(90), ["R"]
         )
         self.fullscreen_action = make_action(self, "全螢幕", self.toggle_fullscreen, ["F", "F11"])
         self.fullscreen_action.setCheckable(True)
@@ -129,6 +149,8 @@ class MainWindow(QMainWindow):
         )
         menu = self.menuBar().addMenu("檔案")
         menu.addAction(self.open_action)
+        self.recent_menu = menu.addMenu("最近閱讀")
+        self.recent_menu.aboutToShow.connect(self._rebuild_recent_menu)
         menu.addSeparator()
         menu.addAction(make_action(self, "結束", self.close, ["Ctrl+Q"]))
         view_menu = self.menuBar().addMenu("檢視")
@@ -164,6 +186,13 @@ class MainWindow(QMainWindow):
         self.cover_action.setCheckable(True)
         self.cover_action.setChecked(self.cover)
         reading_menu.addActions([self.ltr_action, self.rtl_action, self.cover_action])
+        reading_menu.addSeparator()
+        self.bookmark_action = make_action(
+            self, "加入／移除目前頁書籤", self.toggle_current_bookmark, ["Ctrl+B"]
+        )
+        reading_menu.addAction(self.bookmark_action)
+        self.bookmarks_menu = reading_menu.addMenu("頁面書籤")
+        self.bookmarks_menu.aboutToShow.connect(self._rebuild_bookmarks_menu)
         navigation_menu = self.menuBar().addMenu("導覽")
         navigation_menu.addActions(
             [self.first_action, self.previous_action, self.next_action, self.last_action]
@@ -174,6 +203,7 @@ class MainWindow(QMainWindow):
         self.counter = QLabel("0 / 0")
         self.statusBar().addPermanentWidget(self.counter)
         self.viewer.zoom_changed.connect(self._show_zoom)
+        self.viewer.view_mode_changed.connect(self._on_view_mode_changed)
         self.worker = ImageWorker(
             self, registry=self.registry, content_registry=self.content_registry
         )
@@ -207,8 +237,23 @@ class MainWindow(QMainWindow):
             return
         self.thumbnails.reset_session()
         self.source_path = Path(path)
+        source_type = self.content_registry.source_type(self.source_path)
+        self.source_identity = source_identity_for_path(self.source_path, source_type)
+        saved = self.reading_store.get(self.source_identity)
         self.entries = ()
-        self.current_index = 0
+        self.current_index = saved.state.page_index if saved else 0
+        if saved:
+            self.double_page = saved.state.double_page
+            self.rtl = saved.state.rtl
+            self.cover = saved.state.cover
+            self.view_mode = saved.state.fit_mode
+            self.page_zoom_factor = saved.state.zoom_factor
+            self.page_rotation = saved.state.rotation
+        else:
+            self.view_mode = "fit_page"
+            self.page_zoom_factor = 1.0
+            self.page_rotation = 0
+        self._sync_reading_actions()
         self.viewer.reset_view_state()
         for dialog in self._dialogs[:]:
             dialog.close()
@@ -221,10 +266,7 @@ class MainWindow(QMainWindow):
             self.double_page = double
         if rtl is not None:
             self.rtl = rtl
-        self.single_action.setChecked(not self.double_page)
-        self.double_action.setChecked(self.double_page)
-        self.ltr_action.setChecked(not self.rtl)
-        self.rtl_action.setChecked(self.rtl)
+        self._sync_reading_actions()
         if self.entries:
             self.current_index = spread_indices(
                 self.current_index, len(self.entries), self.double_page, self.cover
@@ -234,6 +276,13 @@ class MainWindow(QMainWindow):
     def toggle_cover(self):
         self.cover = self.cover_action.isChecked()
         self.set_reading()
+
+    def _sync_reading_actions(self) -> None:
+        self.single_action.setChecked(not self.double_page)
+        self.double_action.setChecked(self.double_page)
+        self.ltr_action.setChecked(not self.rtl)
+        self.rtl_action.setChecked(self.rtl)
+        self.cover_action.setChecked(self.cover)
 
     def navigate(self, offset: int) -> None:
         indices = spread_indices(
@@ -278,6 +327,8 @@ class MainWindow(QMainWindow):
             return
         self.loading = False
         self.entries = result.entries
+        if result.source_identity is not None:
+            self.source_identity = result.source_identity
         self.current_index = result.index if self.entries else 0
         self._update_navigation()
         if self.entries:
@@ -301,6 +352,9 @@ class MainWindow(QMainWindow):
             self.viewer.set_pages(
                 result.pages, self.rtl
             ) if result.pages else self.viewer.set_image(result.image)
+            self._apply_reader_view_state()
+            self._refresh_bookmark_markers()
+            self._save_reading_state()
         self._update_navigation()
 
     def _ask_password(self, message: str) -> None:
@@ -344,6 +398,7 @@ class MainWindow(QMainWindow):
         self.last_action.setEnabled(has_next)
         for action in self._viewer_actions:
             action.setEnabled(self.viewer._item is not None and not self.loading)
+        self.bookmark_action.setEnabled(bool(self.entries) and not self.loading)
         page = self.current_index + 1 if self.entries else 0
         self.counter.setText(
             f"{page}–{indices[-1] + 1} / {len(self.entries)}"
@@ -366,6 +421,127 @@ class MainWindow(QMainWindow):
                 )
                 + f"  |  {factor:.0%}  |  {self.source_path.name}"
             )
+
+    def fit_current(self) -> None:
+        self.viewer.fit_image()
+
+    def actual_current(self) -> None:
+        self.viewer.actual_size()
+
+    def zoom_current(self, zoom_in: bool) -> None:
+        (self.viewer.zoom_in if zoom_in else self.viewer.zoom_out)()
+
+    @Slot(str, float)
+    def _on_view_mode_changed(self, mode: str, factor: float) -> None:
+        if self._applying_reader_state:
+            return
+        self.view_mode = mode
+        self.page_zoom_factor = factor
+        self._save_reading_state()
+
+    def rotate_current(self, degrees: int) -> None:
+        self.page_rotation = (self.page_rotation + degrees) % 360
+        self.viewer.rotate_image(degrees)
+        self._save_reading_state()
+
+    def _apply_reader_view_state(self) -> None:
+        self._applying_reader_state = True
+        try:
+            if self.view_mode == "fit_page":
+                self.viewer.fit_image()
+            elif self.view_mode == "actual":
+                self.viewer.actual_size()
+            else:
+                self.viewer.set_zoom(self.page_zoom_factor)
+            if self.page_rotation:
+                self.viewer.rotate_image(self.page_rotation)
+        finally:
+            self._applying_reader_state = False
+
+    def _save_reading_state(self) -> None:
+        if not self.entries or self.source_identity is None or self.source_path is None:
+            return
+        self.reading_store.update(
+            self.source_identity,
+            self.source_path.name,
+            ReaderState(
+                page_index=self.current_index,
+                page_count=len(self.entries),
+                double_page=self.double_page,
+                rtl=self.rtl,
+                cover=self.cover,
+                fit_mode=self.view_mode,
+                zoom_factor=self.page_zoom_factor,
+                rotation=self.page_rotation,
+            ),
+        )
+
+    def toggle_current_bookmark(self) -> None:
+        if not self.entries or self.source_identity is None:
+            return
+        entry = self.entries[self.current_index]
+        self.reading_store.toggle_bookmark(self.source_identity, self.current_index, entry.name)
+        self._refresh_bookmark_markers()
+
+    def _refresh_bookmark_markers(self) -> None:
+        indices = (
+            {item.page_index for item in self.reading_store.bookmarks(self.source_identity)}
+            if self.source_identity is not None
+            else set()
+        )
+        self.thumbnails.catalog.set_bookmarks(indices)
+        self.bookmark_action.setEnabled(bool(self.entries))
+
+    @Slot()
+    def _rebuild_bookmarks_menu(self) -> None:
+        self.bookmarks_menu.clear()
+        bookmarks = (
+            self.reading_store.bookmarks(self.source_identity)
+            if self.source_identity is not None
+            else ()
+        )
+        if not bookmarks:
+            action = self.bookmarks_menu.addAction("沒有書籤")
+            action.setEnabled(False)
+            return
+        for bookmark in bookmarks:
+            action = self.bookmarks_menu.addAction(f"{bookmark.page_index + 1}. {bookmark.label}")
+            action.triggered.connect(
+                lambda checked=False, index=bookmark.page_index: self.go_to(index)
+            )
+
+    @Slot()
+    def _rebuild_recent_menu(self) -> None:
+        self.recent_menu.clear()
+        recent = self.reading_store.recent()
+        if not recent:
+            action = self.recent_menu.addAction("沒有最近閱讀紀錄")
+            action.setEnabled(False)
+        for record in recent:
+            action = self.recent_menu.addAction(self._recent_label(record))
+            action.triggered.connect(lambda checked=False, item=record: self._open_recent(item))
+        if recent:
+            self.recent_menu.addSeparator()
+            remove_action = self.recent_menu.addAction("從最近閱讀移除目前項目")
+            remove_action.setEnabled(self.source_identity is not None)
+            remove_action.triggered.connect(self._remove_current_recent)
+            clear_action = self.recent_menu.addAction("清除最近閱讀")
+            clear_action.triggered.connect(self.reading_store.clear_recent)
+
+    @staticmethod
+    def _recent_label(record: ReadingRecord) -> str:
+        return f"{record.display_name} — {record.state.page_index + 1}/{record.state.page_count}"
+
+    def _open_recent(self, record: ReadingRecord) -> None:
+        path = Path(record.identity.canonical_path)
+        if not path.exists():
+            self._show_error("最近閱讀的來源已不存在或無法存取。")
+            return
+        self.open_content(path)
+
+    def _remove_current_recent(self) -> None:
+        if self.source_identity is not None:
+            self.reading_store.remove_recent(self.source_identity)
 
     @Slot()
     def toggle_fullscreen(self) -> None:
@@ -401,7 +577,8 @@ class MainWindow(QMainWindow):
             "Ctrl+滾輪：縮放；一般滾輪：捲動；按住滑鼠左鍵：拖移\n"
             "T：縮圖側欄；檢視／閱讀選單：雙頁、封面與左右閱讀方向\n\n"
             "100% 表示一個圖片像素對應一個螢幕實體像素。\n"
-            "翻頁保留縮放模式，旋轉會重設。圖片與壓縮檔均不會被修改。",
+            "閱讀位置、閱讀模式、旋轉與書籤會保存在本機；密碼不會保存。\n"
+            "圖片與壓縮檔均不會被修改。",
         )
 
     @Slot()
@@ -433,6 +610,7 @@ class MainWindow(QMainWindow):
             event.acceptProposedAction()
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_reading_state()
         if self.worker.isRunning() or self.thumbnails.worker.isRunning():
             self._closing = True
             self.setEnabled(False)

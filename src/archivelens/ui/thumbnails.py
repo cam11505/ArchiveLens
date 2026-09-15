@@ -11,6 +11,7 @@ class ThumbnailModel(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.entries = ()
+        self.bookmarks = set()
         self.cache = ImageCache(THUMBNAIL_CACHE_BYTES)
 
     def rowCount(self, parent=None):
@@ -21,7 +22,8 @@ class ThumbnailModel(QAbstractListModel):
             return None
         row = index.row()
         if role == Qt.ItemDataRole.DisplayRole:
-            return f"{row + 1}. {self.entries[row].name}"
+            marker = "★ " if row in self.bookmarks else ""
+            return f"{marker}{row + 1}. {self.entries[row].name}"
         if role == Qt.ItemDataRole.DecorationRole:
             image = self.cache.get(row)
             return QPixmap.fromImage(image) if image is not None else None
@@ -33,7 +35,15 @@ class ThumbnailModel(QAbstractListModel):
         self.beginResetModel()
         self.entries = entries
         self.cache.clear()
+        self.bookmarks.clear()
         self.endResetModel()
+
+    def set_bookmarks(self, bookmarks):
+        self.bookmarks = set(bookmarks)
+        if self.entries:
+            self.dataChanged.emit(
+                self.index(0), self.index(len(self.entries) - 1), [Qt.ItemDataRole.DisplayRole]
+            )
 
 
 class ThumbnailSidebar(QListView):

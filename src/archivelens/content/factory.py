@@ -2,7 +2,7 @@ from pathlib import Path
 
 from archivelens.archive.factory import DEFAULT_REGISTRY, ArchiveProviderRegistry
 from archivelens.content.archive_provider import ArchiveContentProvider
-from archivelens.content.base import ContentProvider
+from archivelens.content.base import ContentProvider, SourceType
 from archivelens.errors import UnsupportedArchiveError
 
 
@@ -18,6 +18,11 @@ class ContentProviderRegistry:
 
     def supports(self, path: str | Path) -> bool:
         return self.archive_registry.supports(path)
+
+    def source_type(self, path: str | Path) -> SourceType:
+        if Path(path).suffix.casefold() not in self.archive_registry.registered_extensions:
+            raise UnsupportedArchiveError()
+        return SourceType.ARCHIVE
 
     def create(self, path: str | Path) -> ContentProvider:
         if Path(path).suffix.casefold() not in self.archive_registry.registered_extensions:

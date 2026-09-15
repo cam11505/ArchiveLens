@@ -10,6 +10,7 @@ class ImageViewer(QGraphicsView):
     """Fit or physical-pixel zoom, quarter-turn rotation, scrolling and drag panning."""
 
     zoom_changed = Signal(float)
+    view_mode_changed = Signal(str, float)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -111,9 +112,10 @@ class ImageViewer(QGraphicsView):
     def fit_image(self) -> None:
         self.fit_mode = True
         self._apply_view()
+        self.view_mode_changed.emit("fit_page", self.zoom_factor)
 
     def actual_size(self) -> None:
-        self.set_zoom(1.0)
+        self._set_zoom(1.0, "actual")
 
     def zoom_in(self) -> None:
         self.set_zoom(self.zoom_factor * ZOOM_STEP)
@@ -122,11 +124,15 @@ class ImageViewer(QGraphicsView):
         self.set_zoom(self.zoom_factor / ZOOM_STEP)
 
     def set_zoom(self, factor: float) -> None:
+        self._set_zoom(factor, "custom")
+
+    def _set_zoom(self, factor: float, mode: str) -> None:
         if self._item is None:
             return
         self.fit_mode = False
         self.zoom_factor = max(MIN_ZOOM, min(factor, MAX_ZOOM))
         self._apply_view()
+        self.view_mode_changed.emit(mode, self.zoom_factor)
 
     def rotate_image(self, degrees: int) -> None:
         if self._item is None:

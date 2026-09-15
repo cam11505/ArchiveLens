@@ -10,6 +10,7 @@ from archivelens.content.base import (
     PageMediaKind,
     SourceIdentity,
     SourceType,
+    source_identity_for_path,
 )
 from archivelens.content.factory import ContentProviderRegistry, create_content_registry
 
@@ -25,4 +26,5 @@ __all__ = [
     "SourceIdentity",
     "SourceType",
     "create_content_registry",
+    "source_identity_for_path",
 ]

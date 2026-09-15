@@ -46,6 +46,7 @@ class LoadResult:
     error: str = ""
     error_type: type[ArchiveLensError] | None = None
     pages: tuple[PageMedia, ...] = ()
+    source_identity: SourceIdentity | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +162,7 @@ class ImageWorker(QThread):
                 error = ""
                 error_type = None
                 index = request.index
+                source_identity = None
                 try:
                     if request_revision != revision:
                         cache.clear()
@@ -174,6 +176,7 @@ class ImageWorker(QThread):
                         entries = tuple(provider.list_pages())
                         revision = request_revision
                     assert provider is not None
+                    source_identity = provider.source_identity
                     if not entries:
                         raise EmptyArchiveError()
                     indices = spread_indices(
@@ -240,7 +243,14 @@ class ImageWorker(QThread):
                 if not stale:
                     self.result_ready.emit(
                         LoadResult(
-                            request.token, entries, index, image, error, error_type, tuple(pages)
+                            request.token,
+                            entries,
+                            index,
+                            image,
+                            error,
+                            error_type,
+                            tuple(pages),
+                            source_identity,
                         )
                     )
                 image = None

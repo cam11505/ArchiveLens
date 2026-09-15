@@ -28,6 +28,7 @@ def main() -> int:
         args.debug, args.self_test_report.parent / "logs" if args.self_test_report else None
     )
     settings = None
+    reading_store = None
     if args.self_test_report:
         from PySide6.QtCore import QSettings
 
@@ -35,7 +36,10 @@ def main() -> int:
             str(args.self_test_report.with_suffix(".ini")), QSettings.Format.IniFormat
         )
         settings.clear()
-    window = MainWindow(settings=settings)
+        from archivelens.reading_state import ReadingStateStore
+
+        reading_store = ReadingStateStore(args.self_test_report.with_suffix(".reading-state.json"))
+    window = MainWindow(settings=settings, reading_store=reading_store)
     window.show()
     if args.self_test_report:
         from PySide6.QtCore import QTimer

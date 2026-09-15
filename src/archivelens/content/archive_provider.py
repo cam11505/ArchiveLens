@@ -13,6 +13,7 @@ from archivelens.content.base import (
     PageMediaKind,
     SourceIdentity,
     SourceType,
+    source_identity_for_path,
 )
 from archivelens.errors import ArchiveNotOpenError, InvalidArchiveEntryError
 
@@ -69,7 +70,7 @@ class ArchiveContentProvider(ContentProvider):
             )
             for index, entry in enumerate(entries)
         )
-        self._identity = SourceIdentity(SourceType.ARCHIVE, str(source.resolve(strict=False)))
+        self._identity = source_identity_for_path(source, SourceType.ARCHIVE)
 
     def close(self) -> None:
         provider, self._provider = self._provider, None

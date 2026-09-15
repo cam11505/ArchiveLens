@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from threading import Event
 from zipfile import ZipFile
@@ -38,7 +39,10 @@ def test_archive_content_provider_descriptors_and_lifecycle(tmp_path, image_byte
     assert [page.index for page in pages] == [0, 1]
     assert all(page.media_kind is PageMediaKind.RASTER for page in pages)
     assert all(not hasattr(page, "compressed_size") for page in pages)
-    assert provider.source_identity == SourceIdentity(SourceType.ARCHIVE, str(source.resolve()))
+    identity = provider.source_identity
+    assert identity.source_type is SourceType.ARCHIVE
+    assert identity.canonical_path == os.path.normcase(str(source.resolve()))
+    assert identity.size_bytes == source.stat().st_size
     assert provider.load_page(pages[0], PageLoadRequest()).encoded == image_bytes("green")
 
     copied = PageDescriptor(**{field: getattr(pages[0], field) for field in pages[0].__slots__})

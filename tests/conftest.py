@@ -52,9 +52,17 @@ def isolated_settings(tmp_path, monkeypatch):
     from PySide6.QtCore import QSettings
 
     import archivelens.ui.main_window as main_window
+    from archivelens.reading_state import ReadingStateStore
 
     monkeypatch.setattr(
         main_window,
         "create_settings",
         lambda: QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat),
+    )
+    monkeypatch.setattr(
+        main_window,
+        "create_reading_state_store",
+        lambda settings=None: ReadingStateStore(
+            tmp_path.parent / f"{tmp_path.name}-appdata" / "reading-state.json"
+        ),
     )

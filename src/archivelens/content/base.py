@@ -1,3 +1,6 @@
+import hashlib
+import json
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -26,6 +29,37 @@ class SourceIdentity:
 
     source_type: SourceType
     canonical_path: str
+    size_bytes: int | None = None
+    modified_ns: int | None = None
+    scan_signature: str = ""
+
+    @property
+    def storage_key(self) -> str:
+        payload = json.dumps(
+            [
+                self.source_type,
+                self.canonical_path,
+                self.size_bytes,
+                self.modified_ns,
+                self.scan_signature,
+            ],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def source_identity_for_path(
+    path: str | Path, source_type: SourceType, *, scan_signature: str = ""
+) -> SourceIdentity:
+    source = Path(path)
+    canonical = os.path.normcase(str(source.resolve(strict=False)))
+    try:
+        stat = source.stat()
+    except OSError:
+        return SourceIdentity(source_type, canonical, scan_signature=scan_signature)
+    size = stat.st_size if source.is_file() else None
+    return SourceIdentity(source_type, canonical, size, stat.st_mtime_ns, scan_signature)
 
 
 @dataclass(frozen=True, slots=True)
