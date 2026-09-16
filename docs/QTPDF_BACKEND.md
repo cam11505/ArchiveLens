@@ -104,6 +104,8 @@ installer and existing v1.1.0 were not modified.
 
 Release packaging collected the exact 580,351,104-byte official Qt WebEngine/PDF
 6.11.2 source archive and 1,923 license/notice files under `licenses/qtpdf/`.
+Paths longer than the installer-safe bundle limit are content-addressed under `_long/`;
+`PATHS.json` retains their exact upstream paths so attribution context is not lost.
 Its SHA-256 is
 `6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163`,
 which matches Qt's official Metalink. The source archive is included in release

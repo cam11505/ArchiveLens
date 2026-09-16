@@ -1,11 +1,12 @@
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
 import pytest
 
 from archivelens import __version__
+from scripts.prepare_licenses import MAX_LICENSE_PATH_LENGTH, bundled_license_path
 from scripts.verify_release import verify_archive
 from scripts.verify_release_set import verify_release_set
 
@@ -121,3 +122,14 @@ def test_installer_declares_pdf_open_with_without_default_association():
     assert "Software\\Classes\\ArchiveLens.Pdf\\shell\\open\\command" in script
     assert 'Software\\Classes\\.pdf\\OpenWithProgids"' in script
     assert 'Software\\Classes\\.pdf"; ValueType' not in script
+
+
+def test_long_upstream_license_paths_are_bounded_and_stably_indexable():
+    short = PurePosixPath("LICENSES/LGPL-3.0-only.txt")
+    long = PurePosixPath("src") / ("nested/" * 24) / "LICENSE.txt"
+
+    assert bundled_license_path(short) == Path(*short.parts)
+    bundled = bundled_license_path(long)
+    assert bundled.parts[0] == "_long"
+    assert len(bundled.as_posix()) <= MAX_LICENSE_PATH_LENGTH
+    assert bundled == bundled_license_path(long)

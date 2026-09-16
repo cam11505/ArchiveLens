@@ -11,6 +11,16 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
+MAX_LICENSE_PATH_LENGTH = 140
+
+
+def bundled_license_path(relative: PurePosixPath) -> Path:
+    """Keep installer paths bounded while preserving the upstream path in an index."""
+    if len(relative.as_posix()) <= MAX_LICENSE_PATH_LENGTH:
+        return Path(*relative.parts)
+    digest = hashlib.sha256(relative.as_posix().encode("utf-8")).hexdigest()
+    return Path("_long") / f"{digest}{relative.suffix}"
+
 
 def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
     name, location = source
@@ -36,7 +46,9 @@ def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
             shutil.copyfileobj(response, output)
         partial.replace(archive)
     destination = root / "build" / "third-party-licenses" / name
+    shutil.rmtree(destination, ignore_errors=True)
     count = 0
+    relocated = {}
     with tarfile.open(archive, "r:*") as source_tar:
         for member in source_tar:
             path = PurePosixPath(member.name)
@@ -51,8 +63,11 @@ def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
                 continue
             if member.size > 4 * 1024 * 1024:
                 continue
-            relative = Path(*path.parts[1:])
-            target = destination / relative
+            relative = PurePosixPath(*path.parts[1:])
+            bundled = bundled_license_path(relative)
+            if bundled.as_posix() != relative.as_posix():
+                relocated[relative.as_posix()] = bundled.as_posix()
+            target = destination / bundled
             target.parent.mkdir(parents=True, exist_ok=True)
             content = source_tar.extractfile(member)
             if content is not None:
@@ -61,6 +76,10 @@ def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
                 count += 1
     if count == 0:
         raise RuntimeError(f"No upstream licenses found in {archive}")
+    if relocated:
+        (destination / "PATHS.json").write_text(
+            json.dumps(relocated, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     with archive.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     if expected_sha256 and digest != expected_sha256:

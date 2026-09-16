@@ -11,6 +11,8 @@
   high-DPI bounded rendering and PDF Open With registration.
 - Added Fit Width/Height and conservative display-only automatic/manual border trim.
 - Extended package diagnostics, licenses, resource/stale-result tests and Windows RC checks.
+- Bounded deeply nested upstream-license paths so the Windows installer remains usable
+  from ordinary and custom installation directories while retaining an origin-path index.
 
 ## 1.1.0 — 2026-09-15
 
