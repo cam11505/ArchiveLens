@@ -126,7 +126,10 @@ def test_installer_declares_pdf_open_with_without_default_association():
 
 def test_long_upstream_license_paths_are_bounded_and_stably_indexable():
     short = PurePosixPath("LICENSES/LGPL-3.0-only.txt")
-    long = PurePosixPath("src") / ("nested/" * 24) / "LICENSE.txt"
+    long = PurePosixPath(
+        "src/3rdparty/chromium/third_party/devtools-frontend/src/node_modules/"
+        "@babel/helper-compilation-targets/node_modules/semver/LICENSE"
+    )
 
     assert bundled_license_path(short) == Path(*short.parts)
     bundled = bundled_license_path(long)

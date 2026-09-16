@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
-MAX_LICENSE_PATH_LENGTH = 140
+MAX_LICENSE_PATH_LENGTH = 96
 
 
 def bundled_license_path(relative: PurePosixPath) -> Path:
