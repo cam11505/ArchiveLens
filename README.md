@@ -91,6 +91,7 @@ See [provider contract](docs/PROVIDERS.md), [display policy](docs/READER_DISPLAY
 python -m pytest -q
 python -m ruff check src tests scripts
 python -m ruff format --check src tests scripts
+python scripts/license_audit.py --check
 python scripts/prepare_licenses.py
 python scripts/build_portable.py
 python -m build --no-isolation --outdir dist/release
@@ -107,6 +108,12 @@ diagnostics. See [development](docs/DEVELOPMENT.md), [v1.2 QA](docs/V1.2_QA.md),
 
 ## License
 
-ArchiveLens is MIT. Qt/PySide, Pillow, archive libraries and bundled native components
-retain their own licenses. Exact notices and corresponding sources are distributed
-with releases; see [third-party notices](THIRD_PARTY_NOTICES.md).
+**ArchiveLens application source is MIT-licensed open-source software.** Official
+binary distributions are **mixed-license distributions**: Python, Qt/PySide, Pillow,
+archive libraries, UnRAR, Microsoft runtime components and other bundled software retain
+their own terms. In particular, the bundled UnRAR component is redistributed under its
+upstream freeware license and is not classified by ArchiveLens as FOSS.
+
+Release artifacts include exact notices/corresponding sources plus an SPDX SBOM and an
+audited dependency policy. See [licensing and distribution policy](docs/LICENSING.md),
+[third-party notices](THIRD_PARTY_NOTICES.md), and `license-policy.json`.
