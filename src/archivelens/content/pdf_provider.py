@@ -155,9 +155,21 @@ class PdfContentProvider(ContentProvider):
 
     def _render_page(self, page_index: int, size: QSize):
         try:
-            return self._document.render(page_index, size)
+            return self._document.render(page_index, size, self._render_options())
         except Exception as exc:
             raise PdfRenderError() from exc
+
+    @staticmethod
+    def _render_options():
+        """Reader policy: show visual annotations and optimize text for displays."""
+        from PySide6.QtPdf import QPdfDocumentRenderOptions
+
+        options = QPdfDocumentRenderOptions()
+        options.setRenderFlags(
+            QPdfDocumentRenderOptions.RenderFlag.Annotations
+            | QPdfDocumentRenderOptions.RenderFlag.OptimizedForLcd
+        )
+        return options
 
     @staticmethod
     def _target_size(point_size, request: PageLoadRequest) -> QSize:

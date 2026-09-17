@@ -8,7 +8,11 @@ from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.content.base import PageLoadRequest, PageMediaKind, SourceType
 from archivelens.content.factory import create_content_registry
 from archivelens.content.pdf_provider import PdfContentProvider
-from archivelens.diagnostic_fixtures import password_pdf_fixture, write_pdf_fixture
+from archivelens.diagnostic_fixtures import (
+    annotation_pdf_fixture,
+    password_pdf_fixture,
+    write_pdf_fixture,
+)
 from archivelens.errors import (
     BadPasswordError,
     CorruptedPdfError,
@@ -68,6 +72,28 @@ def test_pdf_provider_password_retry_and_session_cleanup(tmp_path, qapp):
     provider.close()
     secret.clear()
     assert b"reader-secret" not in repr(provider).encode()
+
+
+def test_pdf_provider_explicitly_renders_annotations_and_optimizes_for_lcd(tmp_path, qapp):
+    from PySide6.QtPdf import QPdfDocumentRenderOptions
+
+    source = tmp_path / "annotation.pdf"
+    source.write_bytes(annotation_pdf_fixture())
+    provider = PdfContentProvider()
+    provider.open(source)
+    page = provider.list_pages()[0]
+    target = provider._target_size(
+        provider._document.pagePointSize(0), PageLoadRequest(render_size=(600, 600))
+    )
+    no_annotations = provider._document.render(0, target)
+    rendered = provider.load_page(page, PageLoadRequest(render_size=(600, 600))).image
+    flags = provider._render_options().renderFlags()
+
+    assert flags & QPdfDocumentRenderOptions.RenderFlag.Annotations
+    assert flags & QPdfDocumentRenderOptions.RenderFlag.OptimizedForLcd
+    assert rendered is not None
+    assert rendered != no_annotations
+    provider.close()
 
 
 def test_pdf_provider_corruption_page_and_render_guards(tmp_path, qapp, monkeypatch):

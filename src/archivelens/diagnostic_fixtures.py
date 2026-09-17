@@ -14,6 +14,38 @@ def password_pdf_fixture() -> bytes:
     return base64.b64decode(_PASSWORD_PDF)
 
 
+def annotation_pdf_fixture() -> bytes:
+    """One-page PDF with vector/text content and a visible red square annotation."""
+    objects = (
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] "
+        b"/Resources << /Font << /F1 6 0 R >> >> /Contents 4 0 R /Annots [5 0 R] >>",
+        b"<< /Length 72 >>\nstream\n"
+        b"0 0 0 RG 1 w 20 20 m 280 280 l S BT /F1 9 Tf 30 250 Td (small vector text) Tj ET\n"
+        b"endstream",
+        b"<< /Type /Annot /Subtype /Square /Rect [80 80 220 220] "
+        b"/C [1 0 0] /BS << /W 8 /S /S >> /F 4 >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    )
+    payload = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, body in enumerate(objects, 1):
+        offsets.append(len(payload))
+        payload.extend(f"{index} 0 obj\n".encode())
+        payload.extend(body)
+        payload.extend(b"\nendobj\n")
+    xref = len(payload)
+    payload.extend(f"xref\n0 {len(objects) + 1}\n".encode())
+    payload.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        payload.extend(f"{offset:010d} 00000 n \n".encode())
+    payload.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    )
+    return bytes(payload)
+
+
 def write_pdf_fixture(path, pages: int = 1, page_mm: tuple[float, float] | None = None) -> None:
     from PySide6.QtCore import QSizeF
     from PySide6.QtGui import QPageSize, QPainter, QPdfWriter
