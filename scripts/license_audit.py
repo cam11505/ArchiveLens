@@ -96,7 +96,8 @@ def validate_runtime_package_names(package_names: list[str], policy: dict) -> No
         if record.get("scope") != "runtime" or not record.get("approved_for_distribution"):
             rejected.append(name)
     if rejected:
-        raise RuntimeError("Runtime dependencies are not approved for distribution: " + ", ".join(rejected))
+        message = "Runtime dependencies are not approved for distribution: "
+        raise RuntimeError(message + ", ".join(rejected))
 
 
 def audited_runtime_packages(root: Path, policy: dict) -> list[dict]:
@@ -170,7 +171,10 @@ def build_spdx_document(root: Path, source_commit: str) -> dict:
             "licenseDeclared": "MIT",
             "copyrightText": "NOASSERTION",
             "primaryPackagePurpose": "APPLICATION",
-            "comment": "ArchiveLens application source; third-party components retain their own licenses.",
+            "comment": (
+                "ArchiveLens application source; third-party components retain "
+                "their own licenses."
+            ),
         }
     ]
     relationships = []
@@ -192,7 +196,8 @@ def build_spdx_document(root: Path, source_commit: str) -> dict:
 
     for record in policy.get("manual_components", []):
         if not record.get("approved_for_distribution"):
-            raise RuntimeError(f"Manual component is not approved: {record.get('name', '<unnamed>')}")
+            name = record.get("name", "<unnamed>")
+            raise RuntimeError(f"Manual component is not approved: {name}")
         package = _package_record(record["name"], _manual_version(record), record)
         if package["SPDXID"] in used_ids:
             raise RuntimeError(f"Duplicate SPDX component identifier: {package['SPDXID']}")
@@ -243,7 +248,9 @@ def git_commit(root: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--check", action="store_true", help="Validate audited runtime dependencies")
+    parser.add_argument(
+        "--check", action="store_true", help="Validate audited runtime dependencies"
+    )
     parser.add_argument("--output", type=Path, help="Write an SPDX 2.3 JSON inventory")
     parser.add_argument("--source-commit", help="Source commit recorded in the SPDX namespace")
     args = parser.parse_args()
