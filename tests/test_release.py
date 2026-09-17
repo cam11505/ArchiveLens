@@ -6,12 +6,52 @@ from zipfile import ZipFile
 import pytest
 
 from archivelens import __version__
+from scripts.license_audit import load_policy, validate_runtime_package_names
 from scripts.prepare_licenses import MAX_LICENSE_PATH_LENGTH, bundled_license_path
 from scripts.verify_release import verify_archive
 from scripts.verify_release_set import verify_release_set
 
 
+def release_policy():
+    return {
+        "schema_version": 1,
+        "python_packages": {},
+        "manual_components": [
+            {
+                "name": "UnRAR64.dll",
+                "classification": "redistributable-non-foss",
+                "approved_for_distribution": True,
+            }
+        ],
+    }
+
+
+def release_sbom():
+    return {
+        "spdxVersion": "SPDX-2.3",
+        "dataLicense": "CC0-1.0",
+        "SPDXID": "SPDXRef-DOCUMENT",
+        "name": f"ArchiveLens-{__version__}-release-sbom",
+        "documentNamespace": f"https://example.invalid/ArchiveLens/{__version__}",
+        "creationInfo": {"created": "2026-01-01T00:00:00Z", "creators": ["Tool: test"]},
+        "packages": [
+            {
+                "SPDXID": "SPDXRef-Package-ArchiveLens",
+                "name": "ArchiveLens",
+                "versionInfo": __version__,
+                "downloadLocation": "NOASSERTION",
+                "filesAnalyzed": False,
+                "licenseConcluded": "MIT",
+                "licenseDeclared": "MIT",
+                "copyrightText": "NOASSERTION",
+            }
+        ],
+    }
+
+
 def create_portable(path, corrupt=False, development=False, sources=None):
+    policy = json.dumps(release_policy()).encode()
+    sbom = json.dumps(release_sbom()).encode()
     files = {
         name: b"fixture"
         for name in [
@@ -20,6 +60,7 @@ def create_portable(path, corrupt=False, development=False, sources=None):
             "licenses/UNRAR-LICENSE.txt",
             "licenses/archive-backends.json",
             "LICENSE",
+            "LICENSING.md",
             "THIRD_PARTY_NOTICES.md",
             "licenses/upstream-sources.json",
             "_internal/PySide6/plugins/platforms/qwindows.dll",
@@ -33,6 +74,8 @@ def create_portable(path, corrupt=False, development=False, sources=None):
             "licenses/qtpdf/LICENSE.Chromium",
         ]
     }
+    files["licenses/license-policy.json"] = policy
+    files[f"ArchiveLens-{__version__}.spdx.json"] = sbom
     files["build-info.json"] = json.dumps(
         {"version": __version__, "source_commit": "a" * 40, "development": development}
     ).encode()
@@ -100,6 +143,14 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
     (tmp_path / f"ArchiveLens-{__version__}-setup-x64.exe").write_bytes(b"installer")
     (tmp_path / f"archivelens-{__version__}-py3-none-any.whl").write_bytes(b"wheel")
     (tmp_path / f"archivelens-{__version__}.tar.gz").write_bytes(b"sdist")
+    (tmp_path / f"ArchiveLens-{__version__}.spdx.json").write_text(
+        json.dumps(release_sbom()), encoding="utf-8"
+    )
+    (tmp_path / "license-policy.json").write_text(
+        json.dumps(release_policy()), encoding="utf-8"
+    )
+    (tmp_path / "LICENSING.md").write_bytes(b"fixture")
+    (tmp_path / "THIRD_PARTY_NOTICES.md").write_bytes(b"fixture")
     (tmp_path / source_name).write_bytes(source_content)
     artifacts = sorted(path for path in tmp_path.iterdir() if path.is_file())
     (tmp_path / "SHA256SUMS.txt").write_text(
@@ -112,6 +163,26 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
     (tmp_path / source_name).write_bytes(b"tampered")
     with pytest.raises(ValueError, match="SHA-256"):
         verify_release_set(tmp_path, "a" * 40)
+
+
+def test_license_policy_rejects_unreviewed_runtime_dependency():
+    root = Path(__file__).resolve().parents[1]
+    policy = load_policy(root)
+    validate_runtime_package_names(["PySide6", "Pillow", "py7zr"], policy)
+    with pytest.raises(RuntimeError, match="Unreviewed runtime dependencies"):
+        validate_runtime_package_names(["PySide6", "unreviewed-decoder"], policy)
+
+
+def test_unrar_is_not_mislabeled_as_foss():
+    root = Path(__file__).resolve().parents[1]
+    policy = load_policy(root)
+    unrar = next(
+        component
+        for component in policy["manual_components"]
+        if component["name"] == "UnRAR64.dll"
+    )
+    assert unrar["classification"] == "redistributable-non-foss"
+    assert unrar["license_expression"] == "NOASSERTION"
 
 
 def test_installer_declares_pdf_open_with_without_default_association():
