@@ -61,7 +61,7 @@ def verify_release_set(directory: Path, expected_commit: str | None = None) -> d
         sbom,
     }
     if not all(path.is_file() for path in required):
-        raise ValueError("Required v1.2 release artifacts are missing")
+        raise ValueError("Required release artifacts are missing")
     if any(
         path.name.startswith("ArchiveLens-") and not path.name.startswith(prefix)
         for path in directory.iterdir()

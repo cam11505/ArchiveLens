@@ -1,6 +1,15 @@
 # Changelog
 
-## 1.2.1 — Unreleased
+## 1.2.1 — 2026-09-17
+
+- Enabled explicit QtPdf annotation and LCD-optimized rendering, with a deterministic
+  compatibility corpus and documented PDFium limitations.
+- Added bounded, render-size-aware PDF rerendering for zoom, resize, rotation and
+  display-scale changes without adding a second render queue.
+- Fixed supported-source drag/drop over the active reader and thumbnail surfaces while
+  rejecting multiple, unsupported and remote URLs before changing the current source.
+- Unified the welcome screen, File menu, native choosers, help and documentation around
+  one Open Content workflow for supported files and image folders.
 
 - Clarified that ArchiveLens application source is MIT-licensed FOSS while official
   binary distributions are mixed-license bundles whose third-party components retain

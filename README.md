@@ -97,9 +97,9 @@ python scripts/prepare_licenses.py
 python scripts/build_portable.py
 python -m build --no-isolation --outdir dist/release
 python scripts/package_release.py
-python scripts/verify_release.py dist/release/ArchiveLens-1.2.0-windows-x64.zip --run
+python scripts/verify_release.py dist/release/ArchiveLens-1.2.1-windows-x64.zip --run
 python scripts/build_installer.py --iscc outputs/inno/ISCC.exe
-python scripts/verify_installer.py dist/release/ArchiveLens-1.2.0-setup-x64.exe
+python scripts/verify_installer.py dist/release/ArchiveLens-1.2.1-setup-x64.exe
 python scripts/release_checksums.py
 ```
 

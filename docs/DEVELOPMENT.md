@@ -42,6 +42,6 @@ archives. Build from a clean committed checkout, then run `build_portable.py`,
 portable and installer verification reject a different commit or incomplete manifest.
 
 CI repeats source tests on Windows/Linux and full portable/installer checks on a clean
-Windows runner. Do not tag v1.2.0 until the exact-commit CI artifacts, local checksum
-verification and `V1.2_QA.md` release-candidate decisions are complete. Automated
+Windows runner. Do not tag v1.2.1 until the exact-commit CI artifacts, local checksum
+verification and `V1.2.1_QA.md` release-candidate decisions are complete. Automated
 offscreen tests are not evidence of physical Explorer or multi-monitor behavior.
