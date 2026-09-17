@@ -100,7 +100,11 @@ def verify_archive(
         if sbom.get("spdxVersion") != "SPDX-2.3" or sbom.get("dataLicense") != "CC0-1.0":
             raise ValueError("Invalid SPDX SBOM header")
         application = next(
-            (package for package in sbom.get("packages", []) if package.get("name") == "ArchiveLens"),
+            (
+                package
+                for package in sbom.get("packages", [])
+                if package.get("name") == "ArchiveLens"
+            ),
             None,
         )
         if not application or application.get("versionInfo") != __version__:
