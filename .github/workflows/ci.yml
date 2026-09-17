@@ -26,6 +26,8 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - run: python -m pip install -c constraints-build.txt -e ".[dev]"
+      - name: Audit runtime dependency licenses
+        run: python scripts/license_audit.py --check
       - name: Prepare bundled RAR backend
         if: runner.os == 'Windows'
         run: python scripts/prepare_backends.py
@@ -43,6 +45,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install -c constraints-build.txt -e ".[dev,build]"
+      - name: Audit packaged runtime dependency licenses
+        run: python scripts/license_audit.py --check
       - run: python scripts/prepare_backends.py
       - run: python scripts/prepare_installer_tools.py
       - run: python scripts/prepare_licenses.py
