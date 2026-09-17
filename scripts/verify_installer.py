@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -39,7 +40,9 @@ def main():
     root = Path(__file__).resolve().parents[1]
     output = root / "outputs" / "installer-verification"
     output.mkdir(parents=True, exist_ok=True)
-    target = output / ("install-" + uuid.uuid4().hex)
+    # QtPdf's complete license tree can exceed Windows path limits when nested
+    # below a long checkout. Keep the real install target intentionally shallow.
+    target = Path(tempfile.gettempdir()) / ("ArchiveLens-install-" + uuid.uuid4().hex[:8])
     target.mkdir()
     sentinel = target / "user-owned-archive.cbz"
     sentinel.write_bytes(b"user-owned fixture; installer must preserve")
