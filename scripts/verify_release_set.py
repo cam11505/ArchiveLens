@@ -48,7 +48,18 @@ def verify_release_set(directory: Path, expected_commit: str | None = None) -> d
     installer = directory / f"{prefix}-setup-x64.exe"
     wheel = directory / f"archivelens-{__version__}-py3-none-any.whl"
     source_dist = directory / f"archivelens-{__version__}.tar.gz"
-    required = {portable, installer, wheel, source_dist, directory / "build-info.json"}
+    sbom = directory / f"{prefix}.spdx.json"
+    required = {
+        portable,
+        installer,
+        wheel,
+        source_dist,
+        directory / "build-info.json",
+        directory / "LICENSING.md",
+        directory / "THIRD_PARTY_NOTICES.md",
+        directory / "license-policy.json",
+        sbom,
+    }
     if not all(path.is_file() for path in required):
         raise ValueError("Required v1.2 release artifacts are missing")
     if any(
@@ -62,6 +73,22 @@ def verify_release_set(directory: Path, expected_commit: str | None = None) -> d
         raise ValueError("Standalone build metadata differs from portable metadata")
     with ZipFile(portable) as archive:
         sources = json.loads(archive.read("ArchiveLens/licenses/upstream-sources.json"))
+        bundled_sbom = json.loads(archive.read(f"ArchiveLens/{prefix}.spdx.json"))
+        bundled_policy = json.loads(archive.read("ArchiveLens/licenses/license-policy.json"))
+        bundled_licensing = archive.read("ArchiveLens/LICENSING.md")
+        bundled_notices = archive.read("ArchiveLens/THIRD_PARTY_NOTICES.md")
+    standalone_sbom = json.loads(sbom.read_text(encoding="utf-8"))
+    if standalone_sbom != bundled_sbom:
+        raise ValueError("Standalone SPDX SBOM differs from portable metadata")
+    standalone_policy = json.loads((directory / "license-policy.json").read_text(encoding="utf-8"))
+    if standalone_policy != bundled_policy:
+        raise ValueError("Standalone license policy differs from portable metadata")
+    if (directory / "LICENSING.md").read_bytes() != bundled_licensing:
+        raise ValueError("Standalone licensing guide differs from portable metadata")
+    if (directory / "THIRD_PARTY_NOTICES.md").read_bytes() != bundled_notices:
+        raise ValueError("Standalone third-party notices differ from portable metadata")
+    if standalone_sbom.get("spdxVersion") != "SPDX-2.3":
+        raise ValueError("Standalone SPDX SBOM has the wrong schema version")
     components = {record["component"] for record in sources}
     if not {"Pillow", "qtpdf", "qtbase", "qtimageformats", "pyside-setup"} <= components:
         raise ValueError("Required v1.2 source/license components are missing")
