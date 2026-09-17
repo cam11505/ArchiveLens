@@ -12,6 +12,11 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from archivelens import __version__
 
+if __package__:
+    from scripts.license_audit import write_spdx_sbom
+else:
+    from license_audit import write_spdx_sbom
+
 
 def sha256(path: Path) -> str:
     with path.open("rb") as stream:
@@ -41,7 +46,9 @@ def main() -> int:
     required = [
         bundle / "ArchiveLens.exe",
         bundle / "licenses" / "upstream-sources.json",
+        bundle / "licenses" / "license-policy.json",
         bundle / "LICENSE",
+        bundle / "LICENSING.md",
         bundle / "THIRD_PARTY_NOTICES.md",
     ]
     if not all(path.is_file() for path in required):
@@ -76,6 +83,9 @@ def main() -> int:
         },
     }
     (bundle / "build-info.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+    sbom_name = f"ArchiveLens-{__version__}.spdx.json"
+    sbom = bundle / sbom_name
+    write_spdx_sbom(root, sbom, commit)
     manifest = {
         str(path.relative_to(bundle)).replace("\\", "/"): {
             "size": path.stat().st_size,
@@ -101,6 +111,9 @@ def main() -> int:
             raise SystemExit(f"Upstream source hash mismatch: {path.name}")
         shutil.copy2(path, output / path.name)
     shutil.copy2(bundle / "build-info.json", output / "build-info.json")
+    shutil.copy2(sbom, output / sbom.name)
+    shutil.copy2(root / "docs" / "LICENSING.md", output / "LICENSING.md")
+    shutil.copy2(root / "license-policy.json", output / "license-policy.json")
     shutil.copy2(root / "THIRD_PARTY_NOTICES.md", output / "THIRD_PARTY_NOTICES.md")
     checksum_files = sorted(
         path for path in output.iterdir() if path.is_file() and path.name != "SHA256SUMS.txt"
