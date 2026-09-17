@@ -34,10 +34,12 @@ def main() -> int:
     target = root / "dist" / "ArchiveLens"
     for name in ("README.md", "README.zh-TW.md", "LICENSE", "THIRD_PARTY_NOTICES.md"):
         shutil.copy2(root / name, target / name)
+    shutil.copy2(root / "docs" / "LICENSING.md", target / "LICENSING.md")
     licenses = root / "build" / "third-party-licenses"
     if not licenses.is_dir():
         raise SystemExit("Run scripts/prepare_licenses.py before packaging a distribution.")
     shutil.copytree(licenses, target / "licenses", dirs_exist_ok=True)
+    shutil.copy2(root / "license-policy.json", target / "licenses" / "license-policy.json")
     source_paths = sorted((root / "src").rglob("*.py")) + [root / "scripts" / "ArchiveLens.spec"]
     fingerprints = {}
     for path in source_paths:
