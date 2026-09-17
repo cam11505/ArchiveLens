@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.1 — Unreleased
+
+- Clarified that ArchiveLens application source is MIT-licensed FOSS while official
+  binary distributions are mixed-license bundles whose third-party components retain
+  their own terms; UnRAR is explicitly treated as a redistributable non-FOSS component.
+- Added `docs/LICENSING.md`, an audited dependency/license policy and SPDX 2.3 release SBOM.
+- Added CI/release license gates so unreviewed runtime dependencies cannot ship silently.
+- Extended portable/installer release verification to require licensing metadata, SBOM,
+  notices, source material and checksums as part of the verified release set.
+
 ## 1.2.0 — 2026-09-16
 
 - Added a source-neutral ContentProvider layer for archives, image folders and PDF.
