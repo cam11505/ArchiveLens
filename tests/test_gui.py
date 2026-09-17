@@ -6,6 +6,7 @@ import pytest
 from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QFileDialog
 
 from archivelens.diagnostic_fixtures import write_pdf_fixture
 from archivelens.image.trim import TrimMargins
@@ -42,7 +43,7 @@ def window(qapp, wait_until, monkeypatch):
 def test_open_navigate_fit_and_no_extraction(window, archive, wait_until):
     before = hashlib.sha256(archive.read_bytes()).digest()
     files_before = set(archive.parent.iterdir())
-    window.open_archive(archive)
+    window.open_content(archive)
     wait_until(lambda: not window.loading)
     assert [entry.name for entry in window.entries] == ["1.png", "2.png", "10.png"]
     assert window.counter.text() == "1 / 3"
@@ -69,6 +70,29 @@ def test_open_navigate_fit_and_no_extraction(window, archive, wait_until):
     assert set(archive.parent.iterdir()) == files_before
 
 
+def test_open_content_labels_shortcuts_and_native_choosers(window, archive, tmp_path, monkeypatch):
+    folder = tmp_path / "images"
+    folder.mkdir()
+    opened = []
+    monkeypatch.setattr(window, "open_content", opened.append)
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args: (str(archive), "fixture"))
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: str(folder))
+
+    assert "開啟內容" in window.message.text()
+    assert window.open_action.text() == "開啟檔案…"
+    assert window.open_folder_action.text() == "開啟圖片資料夾…"
+    assert window.open_action.shortcut().toString() == "Ctrl+O"
+    assert window.open_folder_action.shortcut().toString() == "Ctrl+Shift+O"
+    file_menu = next(
+        action.menu() for action in window.menuBar().actions() if action.text() == "檔案"
+    )
+    assert any(action.text() == "開啟內容" for action in file_menu.actions())
+
+    window.choose_file()
+    window.choose_folder()
+    assert opened == [str(archive), str(folder)]
+
+
 @pytest.mark.parametrize(
     "key,index",
     [
@@ -79,7 +103,7 @@ def test_open_navigate_fit_and_no_extraction(window, archive, wait_until):
     ],
 )
 def test_keyboard_navigation(window, archive, wait_until, key, index):
-    window.open_archive(archive)
+    window.open_content(archive)
     wait_until(lambda: not window.loading)
     window.activateWindow()
     QTest.keyClick(window, key)
@@ -255,7 +279,7 @@ def test_fit_and_manual_trim_actions_are_persisted_without_source_changes(
     window, archive, wait_until
 ):
     before = hashlib.sha256(archive.read_bytes()).digest()
-    window.open_archive(archive)
+    window.open_content(archive)
     wait_until(lambda: not window.loading)
     original = window.viewer.image_size
     window.fit_width_current()
@@ -273,7 +297,7 @@ def test_fit_and_manual_trim_actions_are_persisted_without_source_changes(
 
 
 def test_rapid_navigation_and_stale_result(window, archive, wait_until):
-    window.open_archive(archive)
+    window.open_content(archive)
     wait_until(lambda: not window.loading)
     stale_token = window._token
     window.navigate(1)
@@ -291,18 +315,18 @@ def test_empty_bad_archive_and_corrupt_image_recovery(window, archive, tmp_path,
     empty = tmp_path / "empty.zip"
     with ZipFile(empty, "w"):
         pass
-    window.open_archive(empty)
+    window.open_content(empty)
     wait_until(lambda: not window.loading)
     assert "沒有找到" in window.test_errors[-1]
     assert window.counter.text() == "0 / 0"
-    window.open_archive(tmp_path / "missing.zip")
+    window.open_content(tmp_path / "missing.zip")
     wait_until(lambda: not window.loading)
     assert "無法開啟" in window.test_errors[-1]
     broken = tmp_path / "broken.zip"
     with ZipFile(broken, "w") as target, ZipFile(archive) as source:
         target.writestr("1.png", b"broken")
         target.writestr("2.png", source.read("2.png"))
-    window.open_archive(broken)
+    window.open_content(broken)
     wait_until(lambda: not window.loading)
     assert window.counter.text() == "1 / 2"
     assert window.next_action.isEnabled()
@@ -330,10 +354,10 @@ def test_switch_archive_during_decode(
     with ZipFile(other, "w") as target:
         target.writestr("only.png", image_bytes("yellow"))
     monkeypatch.setattr(worker_module, "decode_image", delayed)
-    window.open_archive(archive)
+    window.open_content(archive)
     try:
         wait_until(entered.is_set)
-        window.open_archive(other)
+        window.open_content(other)
     finally:
         release.set()
     wait_until(lambda: not window.loading)
@@ -355,7 +379,7 @@ def test_close_while_decode_is_active(window, archive, wait_until, monkeypatch):
         return original(data, *args, **kwargs)
 
     monkeypatch.setattr(worker_module, "decode_image", delayed)
-    window.open_archive(archive)
+    window.open_content(archive)
     try:
         wait_until(entered.is_set)
         window.close()
@@ -368,7 +392,7 @@ def test_close_while_decode_is_active(window, archive, wait_until, monkeypatch):
 
 
 def test_viewer_shortcuts_and_fullscreen_restore(window, archive, wait_until, qapp):
-    window.open_archive(archive)
+    window.open_content(archive)
     wait_until(lambda: not window.loading)
     window.activateWindow()
     QTest.keyClick(window, Qt.Key.Key_1)

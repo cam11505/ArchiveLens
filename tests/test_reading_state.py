@@ -132,7 +132,7 @@ def test_gui_resume_reader_state_and_bookmark_marker(tmp_path, image_bytes, qapp
     first = MainWindow(reading_store=ReadingStateStore(state_path))
     first.show()
     try:
-        first.open_archive(source)
+        first.open_content(source)
         wait_until(lambda: not first.loading)
         first.go_to(3)
         wait_until(lambda: not first.loading)
@@ -151,7 +151,7 @@ def test_gui_resume_reader_state_and_bookmark_marker(tmp_path, image_bytes, qapp
     restored = MainWindow(reading_store=ReadingStateStore(state_path))
     restored.show()
     try:
-        restored.open_archive(source)
+        restored.open_content(source)
         wait_until(lambda: not restored.loading)
         assert restored.current_index == bookmarked_index
         assert restored.double_page and restored.rtl

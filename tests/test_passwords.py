@@ -42,7 +42,7 @@ def test_password_dialog_retry_cancel_and_switch(tmp_path, image_bytes, wait_unt
         archive.writestr("1.png", image_bytes())
     window = MainWindow()
     try:
-        window.open_archive(path)
+        window.open_content(path)
         wait_until(lambda: bool(window._dialogs))
         dialog = window._dialogs[0]
         assert isinstance(dialog, PasswordDialog)
@@ -52,7 +52,7 @@ def test_password_dialog_retry_cancel_and_switch(tmp_path, image_bytes, wait_unt
         window._dialogs[0].password.setText("correct")
         window._dialogs[0].accept()
         wait_until(lambda: window.viewer._item is not None)
-        window.open_archive(path)
+        window.open_content(path)
         wait_until(lambda: bool(window._dialogs))
         dialog = window._dialogs[0]
         dialog.password.setText("discard")
@@ -62,7 +62,7 @@ def test_password_dialog_retry_cancel_and_switch(tmp_path, image_bytes, wait_unt
         plain = tmp_path / "plain.zip"
         with ZipFile(plain, "w") as archive:
             archive.writestr("1.png", image_bytes())
-        window.open_archive(plain)
+        window.open_content(plain)
         wait_until(lambda: window.viewer._item is not None)
     finally:
         window.close()

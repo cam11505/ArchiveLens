@@ -97,13 +97,17 @@ class MainWindow(QMainWindow):
         self._pdf_resize_timer.timeout.connect(self._rerender_pdf_for_viewport)
         self.viewer.viewport_changed.connect(self._pdf_resize_timer.start)
         self._pdf_rerender_pending = False
-        self.message = QLabel(f"拖曳 {self.content_registry.format_label()} 到這裡")
+        self.message = QLabel(
+            "開啟內容\n"
+            "選擇支援的檔案或圖片資料夾，也可將 "
+            f"{self.content_registry.format_label()}／資料夾拖曳到這裡"
+        )
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setWordWrap(True)
         self.message.setStyleSheet("font-size: 22px; padding: 24px;")
-        self.open_button = QPushButton("開啟檔案")
-        self.open_button.clicked.connect(self.choose_archive)
-        self.open_folder_button = QPushButton("開啟圖片資料夾")
+        self.open_button = QPushButton("開啟檔案…")
+        self.open_button.clicked.connect(self.choose_file)
+        self.open_folder_button = QPushButton("開啟圖片資料夾…")
         self.open_folder_button.clicked.connect(self.choose_folder)
         welcome = QWidget()
         layout = QVBoxLayout(welcome)
@@ -138,9 +142,9 @@ class MainWindow(QMainWindow):
         for target in self._drop_targets:
             target.setAcceptDrops(True)
             target.installEventFilter(self)
-        self.open_action = make_action(self, "開啟…", self.choose_archive, ["Ctrl+O"])
+        self.open_action = make_action(self, "開啟檔案…", self.choose_file, ["Ctrl+O"])
         self.open_folder_action = make_action(
-            self, "開啟資料夾…", self.choose_folder, ["Ctrl+Shift+O"]
+            self, "開啟圖片資料夾…", self.choose_folder, ["Ctrl+Shift+O"]
         )
         self.previous_action = make_action(
             self, "上一張", lambda: self.navigate(-1), ["PgUp", "Backspace"]
@@ -191,8 +195,9 @@ class MainWindow(QMainWindow):
             ],
         )
         menu = self.menuBar().addMenu("檔案")
-        menu.addAction(self.open_action)
-        menu.addAction(self.open_folder_action)
+        open_menu = menu.addMenu("開啟內容")
+        open_menu.addAction(self.open_action)
+        open_menu.addAction(self.open_folder_action)
         self.recent_menu = menu.addMenu("最近閱讀")
         self.recent_menu.aboutToShow.connect(self._rebuild_recent_menu)
         menu.addSeparator()
@@ -300,21 +305,18 @@ class MainWindow(QMainWindow):
         self._update_navigation()
 
     @Slot()
-    def choose_archive(self) -> None:
+    def choose_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "開啟內容", "", self.content_registry.file_dialog_filter()
+            self, "開啟內容檔案", "", self.content_registry.file_dialog_filter()
         )
         if path:
-            self.open_archive(path)
+            self.open_content(path)
 
     @Slot()
     def choose_folder(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "開啟圖片資料夾")
         if path:
             self.open_content(path)
-
-    def open_archive(self, path: str | Path) -> None:
-        self.open_content(path)
 
     def open_content(self, path: str | Path) -> None:
         if self._closing:
@@ -802,7 +804,9 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "操作說明",
-            f"Ctrl+O：開啟 {self.content_registry.format_label()}；Ctrl+Shift+O：開啟資料夾\n"
+            f"開啟內容：Ctrl+O 選擇 {self.content_registry.format_label()}；"
+            "Ctrl+Shift+O 選擇圖片資料夾\n"
+            "也可將單一支援檔案或圖片資料夾拖曳到閱讀區域\n"
             "← / →：依閱讀方向翻頁；PageUp / PageDown：上一頁 / 下一頁\n"
             "Backspace / Space：上一張 / 下一張\nHome / End：第一張 / 最後一張\n"
             "+ / = / -：縮放　0：符合視窗　1：100%　2：符合寬度　3：符合高度\n"

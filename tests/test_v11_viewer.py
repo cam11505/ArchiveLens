@@ -47,7 +47,7 @@ def test_gif_spread_rtl_thumbnails_settings(tmp_path, image_bytes, wait_until, q
     window = MainWindow(settings=settings)
     window.show()
     try:
-        window.open_archive(path)
+        window.open_content(path)
         wait_until(lambda: not window.loading)
         assert len(window.viewer._movies) == 1
         movie, buffer = window.viewer._movies[0]

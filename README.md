@@ -48,8 +48,9 @@ gates. See [image backend decisions](docs/IMAGE_BACKENDS.md).
 
 | Control | Action |
 | --- | --- |
-| Ctrl+O / drag a supported source | Open archive or PDF |
-| Ctrl+Shift+O | Open image folder |
+| Ctrl+O | Open a supported archive or PDF file |
+| Ctrl+Shift+O | Open an image folder |
+| Drag one supported file or folder | Open or safely switch the current content source |
 | Left / Right | Previous/next according to reading direction |
 | PageUp / Backspace; PageDown / Space | Logical previous/next page or spread |
 | Home / End | First/last spread |
@@ -60,7 +61,7 @@ gates. See [image backend decisions](docs/IMAGE_BACKENDS.md).
 | T | Thumbnail sidebar |
 | Ctrl+B | Add/remove the current page bookmark |
 
-Use View for page layout, fit and border trim. Use Reading for direction, cover,
+Use File > Open Content for the native file/folder choices. Use View for page layout, fit and border trim. Use Reading for direction, cover,
 recursive-folder mode, bookmarks and recent history.
 
 ## Limits and supported cases
