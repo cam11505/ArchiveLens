@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Slot
+from PySide6.QtCore import QEvent, QMimeData, Qt, QTimer, Slot
 from PySide6.QtGui import QActionGroup, QCloseEvent, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QDialog,
@@ -126,6 +126,18 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.thumbnail_dock)
         self.thumbnail_dock.setVisible(read_bool(self.settings, "thumbnails", False))
         self.thumbnails.worker.finished.connect(self._on_worker_finished)
+        self._drop_targets = (
+            self.stack,
+            welcome,
+            self.viewer,
+            self.viewer.viewport(),
+            self.thumbnail_dock,
+            self.thumbnails,
+            self.thumbnails.viewport(),
+        )
+        for target in self._drop_targets:
+            target.setAcceptDrops(True)
+            target.installEventFilter(self)
         self.open_action = make_action(self, "開啟…", self.choose_archive, ["Ctrl+O"])
         self.open_folder_action = make_action(
             self, "開啟資料夾…", self.choose_folder, ["Ctrl+Shift+O"]
@@ -813,23 +825,38 @@ class MainWindow(QMainWindow):
             "詳見 LICENSING.md 與 THIRD_PARTY_NOTICES.md。",
         )
 
-    def _drop_path(self, event: QDragEnterEvent | QDropEvent) -> Path | None:
-        urls = event.mimeData().urls()
+    def _drop_path(self, mime_data: QMimeData) -> Path | None:
+        urls = mime_data.urls()
         if len(urls) == 1 and urls[0].isLocalFile():
             path = Path(urls[0].toLocalFile())
             if self.content_registry.supports(path):
                 return path
         return None
 
+    def _handle_drop_event(self, event: QDragEnterEvent | QDropEvent) -> bool:
+        path = self._drop_path(event.mimeData())
+        if path is None:
+            event.ignore()
+            return True
+        if event.type() == QEvent.Type.Drop:
+            self.open_content(path)
+        event.acceptProposedAction()
+        return True
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched in self._drop_targets and event.type() in {
+            QEvent.Type.DragEnter,
+            QEvent.Type.DragMove,
+            QEvent.Type.Drop,
+        }:
+            return self._handle_drop_event(event)
+        return super().eventFilter(watched, event)
+
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        if self._drop_path(event) is not None:
-            event.acceptProposedAction()
+        self._handle_drop_event(event)
 
     def dropEvent(self, event: QDropEvent) -> None:
-        path = self._drop_path(event)
-        if path is not None:
-            self.open_archive(path)
-            event.acceptProposedAction()
+        self._handle_drop_event(event)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._pdf_resize_timer.stop()

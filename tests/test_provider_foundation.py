@@ -265,7 +265,7 @@ def test_ui_uses_injected_registry(qapp):
             Qt.MouseButton.LeftButton,
             Qt.KeyboardModifier.NoModifier,
         )
-        assert window._drop_path(event).suffix == ".test"
+        assert window._drop_path(event.mimeData()).suffix == ".test"
     finally:
         window.close()
 

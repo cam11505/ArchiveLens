@@ -115,6 +115,68 @@ def test_drag_drop(window, archive, wait_until, qapp):
     assert window.counter.text() == "1 / 3"
 
 
+def _send_drop(qapp, target, urls):
+    mime = QMimeData()
+    mime.setUrls(urls)
+    drag = QDragEnterEvent(
+        QPoint(20, 20),
+        Qt.DropAction.CopyAction,
+        mime,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    qapp.sendEvent(target, drag)
+    drop = QDropEvent(
+        QPointF(20, 20),
+        Qt.DropAction.CopyAction,
+        mime,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    qapp.sendEvent(target, drop)
+    return drag, drop
+
+
+def test_drop_over_active_viewport_switches_source(window, archive, tmp_path, wait_until, qapp):
+    second = tmp_path / "second.pdf"
+    write_pdf_fixture(second, pages=2)
+    window.open_content(archive)
+    wait_until(lambda: not window.loading)
+
+    drag, drop = _send_drop(qapp, window.viewer.viewport(), [QUrl.fromLocalFile(str(second))])
+
+    assert drag.isAccepted()
+    assert drop.isAccepted()
+    wait_until(lambda: not window.loading)
+    assert window.source_path == second
+    assert len(window.entries) == 2
+    assert window.entries[0].extension == ".pdf"
+
+
+@pytest.mark.parametrize(
+    "urls",
+    [
+        [QUrl("https://example.com/book.cbz")],
+        [QUrl.fromLocalFile("C:/missing.txt")],
+        [QUrl.fromLocalFile("C:/one.cbz"), QUrl.fromLocalFile("C:/two.cbz")],
+    ],
+)
+def test_unsupported_viewport_drop_leaves_current_source_intact(
+    window, archive, wait_until, qapp, urls
+):
+    window.open_content(archive)
+    wait_until(lambda: not window.loading)
+    generation = window._generation
+
+    drag, drop = _send_drop(qapp, window.viewer.viewport(), urls)
+
+    assert not drag.isAccepted()
+    assert not drop.isAccepted()
+    assert window.source_path == archive
+    assert window._generation == generation
+    assert window.counter.text() == "1 / 3"
+
+
 def test_pdf_reader_navigation_spread_and_resume(window, tmp_path, wait_until):
     source = tmp_path / "manual.pdf"
     write_pdf_fixture(source, pages=5)
