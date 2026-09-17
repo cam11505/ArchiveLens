@@ -1,7 +1,17 @@
 # Third-party notices
 
-ArchiveLens application source is MIT licensed. Its third-party components retain
-their own licenses; the MIT license does not relicense Python, Qt or PySide6.
+ArchiveLens application source is MIT-licensed open-source software. Official binary
+distributions are **mixed-license distributions**: third-party components retain their
+own licenses, and the MIT license does not relicense Python, Qt/PySide, Pillow, archive
+libraries, UnRAR, Microsoft runtime components, or other bundled software.
+
+Most bundled dependencies are FOSS. The Windows distribution also contains separately
+licensed components. In particular, ArchiveLens classifies the bundled UnRAR component
+as `redistributable-non-foss` because the upstream freeware license contains use/reverse-
+engineering restrictions. Microsoft Visual C++ runtime components retain Microsoft's
+terms. Do not describe the complete Windows binary bundle as "all MIT" or "100% FOSS".
+See `LICENSING.md`, `licenses/license-policy.json`, and the release SPDX SBOM for the
+machine-readable/project-policy view of the same distribution.
 
 ## Windows portable distribution
 
@@ -59,8 +69,10 @@ References: [Qt licensing](https://doc.qt.io/qt-6/licensing.html),
 - Brotli 1.2.0 and texttable 1.7.0: MIT; psutil 7.2.2: BSD-3-Clause;
   backports.zstd 1.7.0: PSF-2.0 with bundled Zstandard license notices.
 - UnRAR64.dll 7.21: official UnRAR DLL freeware license, copyright Alexander Roshal.
-  The SDK permits use in software handling RAR archives. Full license:
-  `licenses/UNRAR-LICENSE.txt`. No WinRAR compressor is distributed.
+  The SDK permits redistribution/use for handling RAR archives subject to its own
+  restrictions, including restrictions related to recreating the proprietary RAR
+  compression algorithm. ArchiveLens does not classify this component as FOSS. Full
+  license: `licenses/UNRAR-LICENSE.txt`. No WinRAR compressor is distributed.
 - Diagnostic RAR fixtures: Copyright Marko Kreen, ISC; license accompanies fixtures.
 - Inno Setup 6.7.3: installer engine by Jordan Russell and Martijn Laan;
   see https://github.com/jrsoftware/issrc/blob/is-6_7_3/license.txt .
@@ -84,3 +96,13 @@ See [backend decisions](docs/BACKENDS.md) for provenance and limitations.
 
 See [image backend decisions](docs/IMAGE_BACKENDS.md) for the tested scope and
 explicitly deferred formats.
+
+## Machine-readable inventory
+
+Starting with the v1.2.1 release line, release packaging also emits
+`ArchiveLens-<version>.spdx.json`. The SPDX document is generated from the installed
+runtime dependency closure plus the reviewed `license-policy.json`. Unknown runtime
+Python distributions fail the license audit until they receive an explicit review and
+policy entry. `NOASSERTION` is used where a custom/mixed/proprietary license should not
+be simplified into a misleading SPDX expression; the full bundled license text remains
+authoritative.
