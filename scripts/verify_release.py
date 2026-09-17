@@ -44,13 +44,17 @@ def verify_archive(
                 digest = hashlib.file_digest(stream, "sha256").hexdigest()
             if digest != record["sha256"]:
                 raise ValueError(f"SHA-256 mismatch: {name}")
+        sbom_name = f"ArchiveLens-{__version__}.spdx.json"
         required = {
             "ArchiveLens.exe",
             "_internal/native/UnRAR64.dll",
             "licenses/UNRAR-LICENSE.txt",
             "licenses/archive-backends.json",
+            "licenses/license-policy.json",
             "LICENSE",
+            "LICENSING.md",
             "THIRD_PARTY_NOTICES.md",
+            sbom_name,
             "build-info.json",
             "licenses/upstream-sources.json",
             "_internal/PySide6/plugins/platforms/qwindows.dll",
@@ -79,6 +83,28 @@ def verify_archive(
             raise ValueError("This is a development package, not a release")
         if expected_commit and build["source_commit"] != expected_commit:
             raise ValueError("The release was built from a different commit")
+        policy = json.loads(archive.read("ArchiveLens/licenses/license-policy.json"))
+        if policy.get("schema_version") != 1:
+            raise ValueError("Unsupported bundled license-policy schema")
+        unrar = next(
+            (
+                component
+                for component in policy.get("manual_components", [])
+                if component.get("name") == "UnRAR64.dll"
+            ),
+            None,
+        )
+        if not unrar or unrar.get("classification") != "redistributable-non-foss":
+            raise ValueError("Bundled UnRAR licensing classification is missing")
+        sbom = json.loads(archive.read("ArchiveLens/" + sbom_name))
+        if sbom.get("spdxVersion") != "SPDX-2.3" or sbom.get("dataLicense") != "CC0-1.0":
+            raise ValueError("Invalid SPDX SBOM header")
+        application = next(
+            (package for package in sbom.get("packages", []) if package.get("name") == "ArchiveLens"),
+            None,
+        )
+        if not application or application.get("versionInfo") != __version__:
+            raise ValueError("SPDX SBOM does not describe this ArchiveLens version")
         return build
 
 
