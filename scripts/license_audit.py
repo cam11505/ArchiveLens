@@ -171,7 +171,9 @@ def build_spdx_document(root: Path, source_commit: str) -> dict:
             "licenseDeclared": "MIT",
             "copyrightText": "NOASSERTION",
             "primaryPackagePurpose": "APPLICATION",
-            "comment": ("ArchiveLens application source; third-party components retain their own licenses."),
+            "comment": (
+                "ArchiveLens application source; third-party components retain their own licenses."
+            ),
         }
     ]
     relationships = []
