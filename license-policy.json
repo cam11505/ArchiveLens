@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "policy_note": "Runtime Python distributions must be explicitly listed and approved before release. Classification is project compliance metadata and does not replace bundled license texts.",
+  "python_packages": {
+    "PySide6": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-3.0-only",
+      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+    },
+    "PySide6_Addons": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-3.0-only",
+      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+    },
+    "PySide6_Essentials": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-3.0-only",
+      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+    },
+    "shiboken6": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-3.0-only",
+      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+    },
+    "Pillow": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "HPND",
+      "license_label": "HPND"
+    },
+    "pyzipper": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "MIT",
+      "license_label": "MIT"
+    },
+    "pycryptodomex": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "NOASSERTION",
+      "license_label": "BSD and public-domain components; see bundled upstream license files"
+    },
+    "py7zr": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-2.1-or-later",
+      "license_label": "GNU LGPL v2.1 or later"
+    },
+    "backports.zstd": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "PSF-2.0",
+      "license_label": "PSF-2.0 with bundled Zstandard notices"
+    },
+    "brotli": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "MIT",
+      "license_label": "MIT"
+    },
+    "inflate64": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-2.1-or-later",
+      "license_label": "GNU LGPL v2.1 or later"
+    },
+    "multivolumefile": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-2.1-or-later",
+      "license_label": "GNU LGPL v2.1 or later"
+    },
+    "psutil": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "BSD-3-Clause",
+      "license_label": "BSD 3-Clause"
+    },
+    "pybcj": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-2.1-or-later",
+      "license_label": "GNU LGPL v2.1 or later"
+    },
+    "pyppmd": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-2.1-or-later",
+      "license_label": "GNU LGPL v2.1 or later"
+    },
+    "texttable": {
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "MIT",
+      "license_label": "MIT"
+    }
+  },
+  "manual_components": [
+    {
+      "name": "Python",
+      "version_source": "python",
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "PSF-2.0",
+      "license_label": "Python Software Foundation License"
+    },
+    {
+      "name": "Qt",
+      "version_source": "PySide6",
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "LGPL-3.0-only",
+      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+    },
+    {
+      "name": "PDFium (via Qt PDF)",
+      "version_source": "PySide6",
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "BSD-3-Clause",
+      "license_label": "PDFium BSD license; additional third-party notices ship with Qt PDF sources"
+    },
+    {
+      "name": "OpenSSL",
+      "version": "3.x",
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "foss",
+      "license_expression": "Apache-2.0",
+      "license_label": "Apache License 2.0"
+    },
+    {
+      "name": "UnRAR64.dll",
+      "version": "7.21",
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "redistributable-non-foss",
+      "license_expression": "NOASSERTION",
+      "license_label": "UnRAR freeware license; redistribution permitted subject to upstream restrictions"
+    },
+    {
+      "name": "Microsoft Visual C++ Runtime",
+      "scope": "runtime",
+      "approved_for_distribution": true,
+      "classification": "proprietary-redistributable",
+      "license_expression": "NOASSERTION",
+      "license_label": "Microsoft redistributable runtime terms"
+    },
+    {
+      "name": "PyInstaller bootloader",
+      "version_source": "pyinstaller",
+      "scope": "runtime-build-artifact",
+      "approved_for_distribution": true,
+      "classification": "foss-with-distribution-exception",
+      "license_expression": "GPL-2.0-or-later",
+      "license_label": "GPL-2.0-or-later with the PyInstaller bootloader exception"
+    },
+    {
+      "name": "Inno Setup",
+      "version": "6.7.3",
+      "scope": "installer-build-artifact",
+      "approved_for_distribution": true,
+      "classification": "separately-licensed",
+      "license_expression": "NOASSERTION",
+      "license_label": "Inno Setup license; see bundled license material"
+    }
+  ]
+}
