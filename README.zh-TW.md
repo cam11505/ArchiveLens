@@ -60,5 +60,15 @@ HEIC／HEIF 與 JPEG XL（JXL）未通過 v1.2 的授權、預檢或封裝成本
 
 ## 授權
 
-ArchiveLens 採 MIT；Qt／PySide、Pillow、壓縮函式庫與原生元件保留各自授權。
-Release 附精確版本、授權與對應來源；詳見 [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md)。
+**ArchiveLens 自有應用程式原始碼採 MIT 授權，屬於自由／開放原始碼軟體。**
+官方 binary 則是**混合授權（mixed-license）發行物**：Python、Qt／PySide、Pillow、
+壓縮函式庫、UnRAR、Microsoft runtime 與其他隨附元件都保留各自授權，不會因為
+ArchiveLens 採 MIT 就一起變成 MIT。
+
+其中 Windows 版隨附的 UnRAR 依上游 freeware license 再散布；由於該授權包含用途／
+逆向工程限制，ArchiveLens 不把這個元件分類為 FOSS。Microsoft Visual C++ runtime
+也依 Microsoft 自有條款散布。
+
+Release 會附完整第三方 notices、對應來源、SPDX SBOM 與經人工審核的 dependency
+policy。詳見 [授權與散布政策](docs/LICENSING.md)、
+[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md) 與 `license-policy.json`。
