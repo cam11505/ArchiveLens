@@ -6,29 +6,29 @@
       "scope": "runtime",
       "approved_for_distribution": true,
       "classification": "foss",
-      "license_expression": "LGPL-3.0-only",
-      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+      "license_expression": "NOASSERTION",
+      "license_label": "Qt for Python is offered under LGPLv3/GPLv3 and commercial terms; ArchiveLens uses the open-source path and verifies the actually bundled Qt modules separately"
     },
     "PySide6_Addons": {
       "scope": "runtime",
       "approved_for_distribution": true,
-      "classification": "foss",
-      "license_expression": "LGPL-3.0-only",
-      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+      "classification": "foss-mixed-module",
+      "license_expression": "NOASSERTION",
+      "license_label": "Qt for Python/Qt module licenses vary by component; only modules actually bundled by ArchiveLens are release obligations, with exact notices collected separately"
     },
     "PySide6_Essentials": {
       "scope": "runtime",
       "approved_for_distribution": true,
       "classification": "foss",
-      "license_expression": "LGPL-3.0-only",
-      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+      "license_expression": "NOASSERTION",
+      "license_label": "Qt for Python is offered under LGPLv3/GPLv3 and commercial terms; ArchiveLens uses the open-source path and verifies bundled module licenses separately"
     },
     "shiboken6": {
       "scope": "runtime",
       "approved_for_distribution": true,
       "classification": "foss",
-      "license_expression": "LGPL-3.0-only",
-      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+      "license_expression": "NOASSERTION",
+      "license_label": "Qt for Python/Shiboken open-source licensing and bundled third-party terms; see exact pyside-setup notices"
     },
     "Pillow": {
       "scope": "runtime",
@@ -63,7 +63,7 @@
       "approved_for_distribution": true,
       "classification": "foss",
       "license_expression": "PSF-2.0",
-      "license_label": "PSF-2.0 with bundled Zstandard notices"
+      "license_label": "PSF-2.0 with bundled Zstandard license notices"
     },
     "brotli": {
       "scope": "runtime",
@@ -132,7 +132,7 @@
       "approved_for_distribution": true,
       "classification": "foss",
       "license_expression": "LGPL-3.0-only",
-      "license_label": "GNU LGPL v3 (ArchiveLens open-source distribution path)"
+      "license_label": "GNU LGPL v3 for the applicable Qt modules used by the ArchiveLens open-source distribution; exact bundled module notices are authoritative"
     },
     {
       "name": "PDFium (via Qt PDF)",
