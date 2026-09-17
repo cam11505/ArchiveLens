@@ -785,8 +785,9 @@ class MainWindow(QMainWindow):
             self,
             "關於 ArchiveLens",
             f"ArchiveLens {__version__}\n直接瀏覽 {self.content_registry.format_label()}。\n\n"
-            "本機操作、唯讀、無遙測。\nMIT License · PySide6 / Qt\n"
-            "第三方元件授權請參閱隨附 THIRD_PARTY_NOTICES.md。",
+            "本機操作、唯讀、無遙測。\nArchiveLens 原始碼：MIT License\n"
+            "隨附第三方元件各自保留其授權條款。\n"
+            "詳見 LICENSING.md 與 THIRD_PARTY_NOTICES.md。",
         )
 
     def _drop_path(self, event: QDragEnterEvent | QDropEvent) -> Path | None:
