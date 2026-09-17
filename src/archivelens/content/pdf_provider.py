@@ -147,10 +147,17 @@ class PdfContentProvider(ContentProvider):
             raise PdfNotOpenError()
         if not 0 <= page.index < len(self._pages) or self._pages[page.index] is not page:
             raise InvalidPageError()
-        target = self._target_size(document.pagePointSize(page.index), request)
+        point_size = document.pagePointSize(page.index)
+        target = self._target_size(point_size, request)
         image = self._render_page(page.index, target)
         if image.isNull() or image.width() != target.width() or image.height() != target.height():
             raise PdfRenderError()
+        if request.thumbnail_size is None:
+            base_width = max(1, point_size.width() * 96 / 72)
+            base_height = max(1, point_size.height() * 96 / 72)
+            image.setDevicePixelRatio(
+                max(0.01, min(image.width() / base_width, image.height() / base_height))
+            )
         return ContentPage(image=image)
 
     def _render_page(self, page_index: int, size: QSize):

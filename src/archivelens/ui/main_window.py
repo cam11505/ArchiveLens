@@ -96,6 +96,7 @@ class MainWindow(QMainWindow):
         self._pdf_resize_timer.setInterval(150)
         self._pdf_resize_timer.timeout.connect(self._rerender_pdf_for_viewport)
         self.viewer.viewport_changed.connect(self._pdf_resize_timer.start)
+        self._pdf_rerender_pending = False
         self.message = QLabel(f"拖曳 {self.content_registry.format_label()} 到這裡")
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setWordWrap(True)
@@ -375,26 +376,20 @@ class MainWindow(QMainWindow):
             self.current_index = index
             self._request_image()
 
-    def _request_image(self, credentials: ArchiveCredentials | None = None) -> None:
+    def _request_image(
+        self, credentials: ArchiveCredentials | None = None, *, preserve_view: bool = False
+    ) -> None:
         if self.source_path is None:
             return
         self._token += 1
         self.loading = True
-        self.viewer.clear_image()
-        self.message.setText("載入中…")
-        self.stack.setCurrentIndex(0)
+        if not preserve_view:
+            self.viewer.clear_image()
+            self.message.setText("載入中…")
+            self.stack.setCurrentIndex(0)
         self.statusBar().showMessage(self.source_path.name)
         self._update_navigation()
-        viewport = self.viewer.viewport().size()
-        device_ratio = self.viewer.devicePixelRatioF()
-        width = min(config.MAX_PDF_RENDER_EDGE, max(1, round(viewport.width() * device_ratio)))
-        height = min(config.MAX_PDF_RENDER_EDGE, max(1, round(viewport.height() * device_ratio)))
-        if self.view_mode == "fit_width":
-            render_size = (width, config.MAX_PDF_RENDER_EDGE)
-        elif self.view_mode == "fit_height":
-            render_size = (config.MAX_PDF_RENDER_EDGE, height)
-        else:
-            render_size = (width, height)
+        render_size = self._pdf_render_size()
         self.worker.submit(
             LoadRequest(
                 self._token,
@@ -458,6 +453,9 @@ class MainWindow(QMainWindow):
             self._apply_reader_view_state()
             self._refresh_bookmark_markers()
             self._save_reading_state()
+            if self._pdf_rerender_pending:
+                self._pdf_rerender_pending = False
+                self._pdf_resize_timer.start(0)
         self._update_navigation()
 
     def _ask_password(self, message: str) -> None:
@@ -550,12 +548,8 @@ class MainWindow(QMainWindow):
         self.page_zoom_factor = factor
         self._sync_view_actions()
         self._save_reading_state()
-        if (
-            self.source_identity is not None
-            and self.source_identity.source_type is SourceType.PDF
-            and mode.startswith("fit_")
-        ):
-            self._pdf_resize_timer.start(0)
+        if self.source_identity is not None and self.source_identity.source_type is SourceType.PDF:
+            self._pdf_resize_timer.start()
 
     def rotate_current(self, degrees: int) -> None:
         self.page_rotation = (self.page_rotation + degrees) % 360
@@ -667,12 +661,41 @@ class MainWindow(QMainWindow):
 
     def _rerender_pdf_for_viewport(self) -> None:
         if (
-            not self.loading
-            and self.entries
-            and self.source_identity is not None
-            and self.source_identity.source_type is SourceType.PDF
+            not self.entries
+            or self.source_identity is None
+            or self.source_identity.source_type is not SourceType.PDF
         ):
-            self._request_image()
+            return
+        if self.loading:
+            self._pdf_rerender_pending = True
+            return
+        self._request_image(preserve_view=True)
+
+    def _pdf_render_size(self) -> tuple[int, int]:
+        viewport = self.viewer.viewport().size()
+        device_ratio = self.viewer.devicePixelRatioF()
+        zoom = self.page_zoom_factor if self.view_mode in {"actual", "custom"} else 1.0
+        width = max(1, round(viewport.width() * device_ratio * zoom))
+        height = max(1, round(viewport.height() * device_ratio * zoom))
+        if self.page_rotation in {90, 270}:
+            width, height = height, width
+        if self.view_mode == "fit_width":
+            height = config.MAX_PDF_RENDER_EDGE
+        elif self.view_mode == "fit_height":
+            width = config.MAX_PDF_RENDER_EDGE
+        return self._bounded_pdf_render_size(width, height)
+
+    @staticmethod
+    def _bounded_pdf_render_size(width: int, height: int) -> tuple[int, int]:
+        width = max(1, width)
+        height = max(1, height)
+        scale = min(
+            1.0,
+            config.MAX_PDF_RENDER_EDGE / width,
+            config.MAX_PDF_RENDER_EDGE / height,
+            (config.MAX_PDF_RENDER_PIXELS / (width * height)) ** 0.5,
+        )
+        return max(1, round(width * scale)), max(1, round(height * scale))
 
     def toggle_current_bookmark(self) -> None:
         if not self.entries or self.source_identity is None:

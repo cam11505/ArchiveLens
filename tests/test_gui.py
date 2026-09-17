@@ -151,6 +151,44 @@ def test_pdf_viewport_resize_requests_fresh_bounded_render(window, tmp_path, wai
     assert window.viewer.image_size.width() * window.viewer.image_size.height() <= 16_000_000
 
 
+def test_pdf_zoom_debounces_bounded_higher_resolution_rerender(window, tmp_path, wait_until, qapp):
+    source = tmp_path / "zoom.pdf"
+    write_pdf_fixture(source)
+    window.open_content(source)
+    wait_until(lambda: not window.loading)
+    initial_pixels = window.viewer.image_size.width() * window.viewer.image_size.height()
+    token = window._token
+
+    window.viewer.set_zoom(2.0)
+    window.viewer.set_zoom(4.0)
+    window.viewer.set_zoom(3.0)
+    qapp.processEvents()
+    wait_until(lambda: window._token > token and not window.loading)
+
+    rerendered_pixels = window.viewer.image_size.width() * window.viewer.image_size.height()
+    assert window._token == token + 1
+    assert rerendered_pixels > initial_pixels
+    assert rerendered_pixels <= 16_000_000
+    assert window.viewer.zoom_factor == pytest.approx(3.0)
+
+
+def test_pdf_render_size_accounts_for_rotation_dpr_zoom_and_clamps(window, monkeypatch):
+    monkeypatch.setattr(window.viewer, "devicePixelRatioF", lambda: 2.0)
+    window.viewer.resize(500, 300)
+    window.view_mode = "custom"
+    window.page_zoom_factor = 4.0
+    normal = window._pdf_render_size()
+    window.page_rotation = 90
+    rotated = window._pdf_render_size()
+
+    assert normal[0] > normal[1]
+    assert rotated[0] < rotated[1]
+    assert normal[0] * normal[1] <= 16_000_000
+    assert max(normal) <= 8192
+
+    assert window._bounded_pdf_render_size(100_000, 100_000)[0] ** 2 <= 16_000_000
+
+
 def test_fit_and_manual_trim_actions_are_persisted_without_source_changes(
     window, archive, wait_until
 ):

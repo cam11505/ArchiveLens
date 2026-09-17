@@ -29,6 +29,7 @@ class ImageViewer(QGraphicsView):
         self.zoom_factor = 1.0
         self.rotation = 0
         self.image_size = QSize()
+        self.render_pixel_ratio = 1.0
         self._updating = False
         self.trim_mode = "off"
         self.trim_margins = TrimMargins()
@@ -67,6 +68,7 @@ class ImageViewer(QGraphicsView):
         self._item = None
         self.rotation = 0
         self.image_size = QSize()
+        self.render_pixel_ratio = 1.0
         self.resetTransform()
         self.scene().setSceneRect(0, 0, 0, 0)
 
@@ -78,6 +80,7 @@ class ImageViewer(QGraphicsView):
         items = []
         x = 0
         displayed_sizes = []
+        render_ratios = []
         for page in reversed(pages) if rtl else pages:
             crop = trim_rect(page.image, self.trim_mode, self.trim_margins)
             displayed = page.image.copy(crop) if crop != page.image.rect() else page.image
@@ -87,6 +90,7 @@ class ImageViewer(QGraphicsView):
             item.setPos(x, 0)
             x += displayed.width() + 12
             displayed_sizes.append(displayed.size())
+            render_ratios.append(max(0.01, page.image.devicePixelRatio()))
             item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
             items.append(item)
             if page.animation:
@@ -112,6 +116,7 @@ class ImageViewer(QGraphicsView):
         if not items:
             return
         self._item = items[0]
+        self.render_pixel_ratio = min(render_ratios)
         self.image_size = QSize(x - 12, max(size.height() for size in displayed_sizes))
         if len(items) > 1:
             self._group = self.scene().createItemGroup(items)
@@ -193,8 +198,9 @@ class ImageViewer(QGraphicsView):
                     scale = height_scale
                 else:
                     scale = min(width_scale, height_scale)
-                self.zoom_factor = scale * dpr
-            self.setTransform(QTransform.fromScale(self.zoom_factor / dpr, self.zoom_factor / dpr))
+                self.zoom_factor = scale * dpr * self.render_pixel_ratio
+            display_scale = self.zoom_factor / (dpr * self.render_pixel_ratio)
+            self.setTransform(QTransform.fromScale(display_scale, display_scale))
             if self.fit_mode:
                 self.centerOn(self.sceneRect().center())
             self.zoom_changed.emit(self.zoom_factor)

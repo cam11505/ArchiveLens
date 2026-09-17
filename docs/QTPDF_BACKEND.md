@@ -106,6 +106,16 @@ queue would weaken the existing replaceable-pending-request guarantee.
 High-DPI requests use device pixels derived from logical target size, device pixel
 ratio and reader zoom, then clamp to the limits above while preserving page aspect.
 
+In v1.2.1, fit/actual/custom zoom changes and viewport/DPR changes feed one 150 ms
+debounce timer. A custom zoom requests a correspondingly denser source render;
+the rendered image records its density relative to the PDF's 96-DPI logical page
+size so replacing the raster does not change the visible page geometry. Rapid
+updates still enter the existing worker's single replaceable pending slot, and a
+request arriving during an in-flight render is retried only after the current
+result is resolved. Cache identity includes the exact render bounds and retention
+removes obsolete size variants. Requests above the edge/pixel limits are clamped
+while UI zoom remains available, defining an intentional quality ceiling.
+
 ## Password handling
 
 The tested standard-encryption fixture emitted/returned `IncorrectPassword` for

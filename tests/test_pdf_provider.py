@@ -45,6 +45,7 @@ def test_pdf_provider_lists_stable_pages_and_renders_bounded_images(tmp_path, qa
     assert full is not None and full.width() <= 800 and full.height() <= 600
     assert thumbnail is not None and thumbnail.width() <= 144 and thumbnail.height() <= 144
     assert full.width() * full.height() <= 16_000_000
+    assert full.devicePixelRatio() > 0
 
     copied = type(pages[0])(**{field: getattr(pages[0], field) for field in pages[0].__slots__})
     with pytest.raises(InvalidPageError):
