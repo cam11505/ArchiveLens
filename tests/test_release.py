@@ -146,9 +146,7 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
     (tmp_path / f"ArchiveLens-{__version__}.spdx.json").write_text(
         json.dumps(release_sbom()), encoding="utf-8"
     )
-    (tmp_path / "license-policy.json").write_text(
-        json.dumps(release_policy()), encoding="utf-8"
-    )
+    (tmp_path / "license-policy.json").write_text(json.dumps(release_policy()), encoding="utf-8")
     (tmp_path / "LICENSING.md").write_bytes(b"fixture")
     (tmp_path / "THIRD_PARTY_NOTICES.md").write_bytes(b"fixture")
     (tmp_path / source_name).write_bytes(source_content)
@@ -177,9 +175,7 @@ def test_unrar_is_not_mislabeled_as_foss():
     root = Path(__file__).resolve().parents[1]
     policy = load_policy(root)
     unrar = next(
-        component
-        for component in policy["manual_components"]
-        if component["name"] == "UnRAR64.dll"
+        component for component in policy["manual_components"] if component["name"] == "UnRAR64.dll"
     )
     assert unrar["classification"] == "redistributable-non-foss"
     assert unrar["license_expression"] == "NOASSERTION"
