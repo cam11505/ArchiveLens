@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QMimeData, Qt, QTimer, Slot
@@ -304,19 +305,27 @@ class MainWindow(QMainWindow):
                 pass
         self._update_navigation()
 
+    def set_open_source_handler(self, handler: Callable[[str | Path], None]) -> None:
+        """Route UI source requests through the application-level boundary."""
+        self._open_source_handler = handler
+
+    def _open_source(self, path: str | Path) -> None:
+        handler = getattr(self, "_open_source_handler", self.open_content)
+        handler(path)
+
     @Slot()
     def choose_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "開啟內容檔案", "", self.content_registry.file_dialog_filter()
         )
         if path:
-            self.open_content(path)
+            self._open_source(path)
 
     @Slot()
     def choose_folder(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "開啟圖片資料夾")
         if path:
-            self.open_content(path)
+            self._open_source(path)
 
     def open_content(self, path: str | Path) -> None:
         if self._closing:
@@ -366,7 +375,7 @@ class MainWindow(QMainWindow):
     def toggle_recursive_folders(self) -> None:
         self.recursive_folders = self.recursive_action.isChecked()
         if self.source_path is not None and self.source_path.is_dir():
-            self.open_content(self.source_path)
+            self._open_source(self.source_path)
 
     def _sync_reading_actions(self) -> None:
         self.single_action.setChecked(not self.double_page)
@@ -772,7 +781,7 @@ class MainWindow(QMainWindow):
         if not path.exists():
             self._show_error("最近閱讀的來源已不存在或無法存取。")
             return
-        self.open_content(path)
+        self._open_source(path)
 
     def _remove_current_recent(self) -> None:
         if self.source_identity is not None:
@@ -843,7 +852,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             return True
         if event.type() == QEvent.Type.Drop:
-            self.open_content(path)
+            self._open_source(path)
         event.acceptProposedAction()
         return True
 

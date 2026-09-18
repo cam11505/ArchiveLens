@@ -11,6 +11,7 @@ import pyzipper
 from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import DEFAULT_REGISTRY
 from archivelens.diagnostic_fixtures import zipcrypto_fixture
+from archivelens.platform_paths import is_frozen_runtime, runtime_root
 
 
 def check_backends(image):
@@ -45,11 +46,8 @@ def check_backends(image):
                 }[path.name]
             )
         if sys.platform == "win32":
-            fixtures = (
-                Path(sys._MEIPASS) / "self-test-rar"
-                if getattr(sys, "frozen", False)
-                else Path(__file__).resolve().parents[2] / "tests/fixtures/rar"
-            )
+            relative = "self-test-rar" if is_frozen_runtime() else "tests/fixtures/rar"
+            fixtures = runtime_root() / relative
             for name in ("rar3-solid.rar", "rar5-solid.rar", "rar5-hpsw.rar"):
                 path = fixtures / name
                 with (

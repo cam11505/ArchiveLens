@@ -3,9 +3,9 @@ import sys
 from pathlib import Path
 
 from PySide6.QtGui import QImageReader
-from PySide6.QtWidgets import QApplication
 
 from archivelens import __version__
+from archivelens.application import ArchiveLensApplication
 from archivelens.config import IMAGE_ALLOCATION_LIMIT_MB
 from archivelens.logging_setup import configure_logging
 from archivelens.ui.main_window import MainWindow
@@ -20,7 +20,7 @@ def main() -> int:
     parser.add_argument("--self-test-screenshot", type=Path, help="Save the diagnostic window")
     args = parser.parse_args()
     QImageReader.setAllocationLimit(IMAGE_ALLOCATION_LIMIT_MB)
-    app = QApplication(sys.argv[:1])
+    app = ArchiveLensApplication(sys.argv[:1])
     app.setApplicationName("ArchiveLens")
     app.setOrganizationName("ArchiveLens")
     app.setApplicationVersion(__version__)
@@ -40,6 +40,8 @@ def main() -> int:
 
         reading_store = ReadingStateStore(args.self_test_report.with_suffix(".reading-state.json"))
     window = MainWindow(settings=settings, reading_store=reading_store)
+    app.set_open_source_handler(window.open_content)
+    window.set_open_source_handler(app.open_source)
     window.show()
     if args.self_test_report:
         from PySide6.QtCore import QTimer
@@ -52,7 +54,7 @@ def main() -> int:
         runner.cleanup()
         return runner.exit_code
     if args.source:
-        window.open_content(args.source)
+        app.open_source(args.source)
     return app.exec()
 
 

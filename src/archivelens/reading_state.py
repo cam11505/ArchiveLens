@@ -17,6 +17,7 @@ from archivelens.config import (
     RECENT_HISTORY_LIMIT,
 )
 from archivelens.content.base import SourceIdentity, SourceType
+from archivelens.platform_paths import writable_location
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,8 +57,8 @@ def _utc_now() -> str:
 
 def default_reading_state_path(settings: QSettings | None = None) -> Path:
     del settings
-    root = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
-    return Path(root) / "reading-state.json"
+    root = writable_location(QStandardPaths.StandardLocation.AppDataLocation)
+    return root / "reading-state.json"
 
 
 class ReadingStateStore:

@@ -6,6 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import QStandardPaths
 
 from archivelens.config import LOG_BACKUP_COUNT, LOG_MAX_BYTES
+from archivelens.platform_paths import writable_location
 
 
 def configure_logging(debug: bool = False, directory: Path | None = None) -> Path | None:
@@ -25,12 +26,7 @@ def configure_logging(debug: bool = False, directory: Path | None = None) -> Pat
     try:
         base = (
             directory
-            or Path(
-                QStandardPaths.writableLocation(
-                    QStandardPaths.StandardLocation.AppLocalDataLocation
-                )
-            )
-            / "logs"
+            or writable_location(QStandardPaths.StandardLocation.AppLocalDataLocation) / "logs"
         )
         base.mkdir(parents=True, exist_ok=True)
         log_path = base / "ArchiveLens.log"

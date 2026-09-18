@@ -14,12 +14,11 @@ from archivelens.errors import (
     ResourceLimitError,
     UnsupportedCompressionError,
 )
+from archivelens.platform_paths import native_backend_path
 
 
 def dll_path():
-    if getattr(sys, "frozen", False):
-        return Path(sys._MEIPASS) / "native" / "UnRAR64.dll"
-    return Path(__file__).resolve().parents[3] / "outputs" / "backends" / "UnRAR64.dll"
+    return native_backend_path("UnRAR64.dll")
 
 
 CALLBACK = getattr(c, "WINFUNCTYPE", c.CFUNCTYPE)(

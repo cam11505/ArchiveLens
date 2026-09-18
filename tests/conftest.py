@@ -6,14 +6,14 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest  # noqa: E402
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice  # noqa: E402
 from PySide6.QtGui import QColor, QImage, QImageReader  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
 
+from archivelens.application import ArchiveLensApplication  # noqa: E402
 from archivelens.config import IMAGE_ALLOCATION_LIMIT_MB  # noqa: E402
 
 
 @pytest.fixture(scope="session")
 def qapp():
-    app = QApplication.instance() or QApplication([])
+    app = ArchiveLensApplication.instance() or ArchiveLensApplication([])
     app.setQuitOnLastWindowClosed(False)
     QImageReader.setAllocationLimit(IMAGE_ALLOCATION_LIMIT_MB)
     yield app
