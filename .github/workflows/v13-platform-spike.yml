@@ -3,7 +3,7 @@ name: v1.3 platform spike
 on:
   workflow_dispatch:
   push:
-    branches: ["codex/v1.3-issue-42"]
+    branches: ["codex/v1.3-issue-42*"]
     paths:
       - ".github/workflows/v13-platform-spike.yml"
       - "constraints-build.txt"
@@ -45,6 +45,7 @@ jobs:
           python scripts/v13_platform_diagnostic.py
           --output outputs/v13-platform/source.json
           --require-machine ${{ matrix.required_machine }}
+          --require-version 1.2.2
         env:
           QT_QPA_PLATFORM: offscreen
       - name: Build minimal frozen diagnostic
@@ -61,6 +62,7 @@ jobs:
           ./dist/ArchiveLens-v13-diagnostic/ArchiveLens-v13-diagnostic
           --output outputs/v13-platform/frozen.json
           --require-machine ${{ matrix.required_machine }}
+          --require-version 1.2.2
         env:
           QT_QPA_PLATFORM: offscreen
       - name: Record executable architecture

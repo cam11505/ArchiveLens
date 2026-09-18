@@ -16,6 +16,23 @@ architecture, Qt Core/Gui/Widgets, QtPdf, Qt plugin discovery, writable runtime
 paths, Pillow codec availability, and archive-provider registration. It did not
 produce a release-quality application package.
 
+## v1.2.2 delta revalidation
+
+The immutable implementation baseline for #43–#51 is `v1.2.2` /
+`bb0197b0291707287517ba8bdfc3a10ce1ad1149`. The original v1.2.0 spike remains
+historical evidence; #42 is rerun only for the maintenance delta that affected
+QtPdf rendering, zoom-aware PDF requests, unified Open Content and drag/drop,
+dependency licensing, SBOMs, and release verification.
+
+The source and frozen diagnostics now exercise the production
+`PdfContentProvider` with a generated one-page fixture and require its rendered
+page to be opaque with a white background. The full suite remains responsible
+for zoom/cache bounds, password PDFs, source routing, drag/drop, licensing, and
+release verification. No private reporter PDF is stored or uploaded.
+
+Final macOS arm64 and Linux run IDs and results are recorded after the delta
+workflow completes.
+
 ## Results
 
 | Environment | Source tests | Source diagnostic | Frozen diagnostic | Executable |

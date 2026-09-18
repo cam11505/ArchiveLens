@@ -19,6 +19,13 @@ def test_platform_diagnostic_schema(qapp):
     assert report["qt"]["qimage_smoke"] is True
     assert report["qt"]["qwidget_smoke"] is True
     assert report["qt"]["qtpdf_smoke"] is True
+    pdf_render = report["qt"]["qtpdf_production_render"]
+    assert pdf_render["pages"] == 1
+    assert pdf_render["width"] > 0
+    assert pdf_render["height"] > 0
+    assert pdf_render["has_alpha_channel"] is False
+    assert pdf_render["corner_rgba"] == [255, 255, 255, 255]
+    assert pdf_render["opaque_white_background"] is True
     assert {".zip", ".cbz", ".7z"} <= set(report["backends"]["archive_available"])
     assert {".jpg", ".png", ".webp", ".avif", ".jp2"} <= set(
         report["backends"]["decoder_available"]
