@@ -30,8 +30,36 @@ page to be opaque with a white background. The full suite remains responsible
 for zoom/cache bounds, password PDFs, source routing, drag/drop, licensing, and
 release verification. No private reporter PDF is stored or uploaded.
 
-Final macOS arm64 and Linux run IDs and results are recorded after the delta
-workflow completes.
+Delta commit: `56b3231fd0a483e65e963910df92714eef93b858`.
+GitHub Actions run: [35336602802](https://github.com/cam11505/ArchiveLens/actions/runs/35336602802).
+
+| Environment | Source tests | Source diagnostic | Frozen diagnostic | Executable |
+| --- | --- | --- | --- | --- |
+| macOS 15 arm64 | 189 passed, 1 skipped | pass | pass | Mach-O 64-bit arm64 |
+| Ubuntu x64 | 189 passed, 1 skipped | pass | pass | ELF 64-bit x86-64 |
+
+Both environments reported ArchiveLens 1.2.2, PySide6/Qt 6.11.2, Pillow
+12.3.0, the complete shipped decoder extension set, and successful production
+QtPdf rendering in source and frozen layouts. Every render was RGB/opaque with
+corner RGBA `[255, 255, 255, 255]`. The macOS runner used Python 3.12.10 and
+the Ubuntu runner used Python 3.12.14; both satisfy the Python 3.12 contract.
+
+### Delta classification
+
+| Area | Classification | Evidence / follow-up |
+| --- | --- | --- |
+| #54 QtPdf render policy | changed and revalidated | Full tests plus source/frozen production-render smoke passed on both platforms. |
+| #55 zoom/DPI-aware PDF requests | changed and revalidated | Full PDF/provider/GUI tests passed; resource and cache contracts remain covered by the suite. |
+| #56 drag/drop event routing | changed and revalidated | Full GUI tests passed on macOS arm64, Linux x64, and the regular Windows lane. |
+| #57 unified Open Content | changed and revalidated | Current shared `MainWindow.open_content` flow passed the full cross-platform source suite; #43 still owns the application-level `open_source` seam and Finder events. |
+| #58 licensing/SBOM | changed, conclusions still valid | Dependency versions are unchanged; the regular CI license audit passed. Platform packaging must retain the current notices/SBOM policy. |
+| #59 release/package state | changed, conclusions still valid | Windows release verification remains separate; the v1.3 spike found no new non-Windows frozen-layout blocker. |
+| v1.2.2 white PDF background | changed and revalidated | Synthetic production render passed in all four macOS/Linux source/frozen combinations. |
+| RAR/CBR | unchanged; preliminary No-Go remains | RAR remains registered but unavailable on macOS/Linux. #44 must produce and qualify the native backend before release. |
+
+Conclusion: the original #52 compatibility findings remain valid after the
+v1.2.2 delta. Issue #43 may proceed after this documentation and its exact
+evidence are merged; #44 remains the formal RAR Go/No-Go gate.
 
 ## Results
 
