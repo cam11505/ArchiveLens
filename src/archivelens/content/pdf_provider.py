@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QSize
+from PySide6.QtGui import QImage, QPainter
 
 from archivelens import config
 from archivelens.archive.credentials import ArchiveCredentials
@@ -162,9 +163,24 @@ class PdfContentProvider(ContentProvider):
 
     def _render_page(self, page_index: int, size: QSize):
         try:
-            return self._document.render(page_index, size, self._render_options())
+            rendered = self._document.render(page_index, size, self._render_options())
+            return self._composite_page_background(rendered)
         except Exception as exc:
             raise PdfRenderError() from exc
+
+    @staticmethod
+    def _composite_page_background(image: QImage) -> QImage:
+        """Display PDF transparency over the conventional opaque white page."""
+        if image.isNull():
+            return image
+        page = QImage(image.size(), QImage.Format.Format_RGB32)
+        page.fill(0xFFFFFFFF)
+        painter = QPainter(page)
+        try:
+            painter.drawImage(0, 0, image)
+        finally:
+            painter.end()
+        return page
 
     @staticmethod
     def _render_options():

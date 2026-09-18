@@ -109,7 +109,8 @@ def main() -> int:
         path = root / "build" / "upstream-sources" / source["source_archive"]
         if sha256(path) != source["sha256"]:
             raise SystemExit(f"Upstream source hash mismatch: {path.name}")
-        shutil.copy2(path, output / path.name)
+        if "distribution_url" not in source:
+            shutil.copy2(path, output / path.name)
     shutil.copy2(bundle / "build-info.json", output / "build-info.json")
     shutil.copy2(sbom, output / sbom.name)
     shutil.copy2(root / "docs" / "LICENSING.md", output / "LICENSING.md")

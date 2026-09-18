@@ -4,9 +4,22 @@ import argparse
 import hashlib
 import json
 from pathlib import Path, PurePath
+from urllib.parse import urlparse
 from zipfile import ZipFile
 
 from archivelens import __version__
+
+CONTROLLED_SOURCE_REFERENCES = {
+    (
+        "https://github.com/cam11505/ArchiveLens/releases/download/v1.2.1/"
+        "qtwebengine-everywhere-src-6.11.2.tar.xz"
+    ): {
+        "component": "qtpdf",
+        "version": "6.11.2",
+        "source_archive": "qtwebengine-everywhere-src-6.11.2.tar.xz",
+        "sha256": "6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163",
+    }
+}
 
 if __package__:
     from scripts.verify_release import verify_archive
@@ -17,6 +30,31 @@ else:
 def sha256(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def verify_distribution_source(record: dict, directory: Path) -> None:
+    source = directory / record["source_archive"]
+    distribution_url = record.get("distribution_url")
+    if distribution_url:
+        expected = CONTROLLED_SOURCE_REFERENCES.get(distribution_url)
+        parsed = urlparse(distribution_url)
+        expected_path = f"/cam11505/ArchiveLens/releases/download/v1.2.1/{record['source_archive']}"
+        if (
+            expected is None
+            or any(record.get(name) != value for name, value in expected.items())
+            or parsed.scheme != "https"
+            or parsed.netloc != "github.com"
+            or parsed.path != expected_path
+            or parsed.params
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(f"Invalid controlled source reference: {record['component']}")
+        if source.exists():
+            raise ValueError(f"Reused source must not be duplicated: {record['component']}")
+        return
+    if not source.is_file() or sha256(source) != record["sha256"]:
+        raise ValueError(f"Upstream source mismatch: {record['component']}")
 
 
 def verify_release_set(directory: Path, expected_commit: str | None = None) -> dict:
@@ -93,9 +131,7 @@ def verify_release_set(directory: Path, expected_commit: str | None = None) -> d
     if not {"Pillow", "qtpdf", "qtbase", "qtimageformats", "pyside-setup"} <= components:
         raise ValueError("Required v1.2 source/license components are missing")
     for record in sources:
-        source = directory / record["source_archive"]
-        if not source.is_file() or sha256(source) != record["sha256"]:
-            raise ValueError(f"Upstream source mismatch: {record['component']}")
+        verify_distribution_source(record, directory)
     return {"version": __version__, "source_commit": build["source_commit"], "files": len(records)}
 
 

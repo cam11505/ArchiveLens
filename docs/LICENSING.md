@@ -77,7 +77,9 @@ preserve the practical requirements relevant to this distribution model:
 - Qt/PySide libraries are dynamically loaded from the application distribution rather
   than being incorporated into ArchiveLens source under the MIT license.
 - Corresponding upstream Qt/PySide source archives and license/attribution material are
-  published with the release.
+  published under ArchiveLens project control. A release may reference an identical,
+  hash-verified source asset from an earlier ArchiveLens release instead of uploading a
+  duplicate; `licenses/upstream-sources.json` records the controlled URL and SHA-256.
 - The application and build scripts do not prohibit replacement of compatible Qt/PySide
   libraries with modified builds.
 - ArchiveLens does not prohibit reverse engineering for the purpose of debugging
@@ -161,7 +163,8 @@ A publishable release should contain or make available at least:
 - `licenses/upstream-sources.json` with exact source archive hashes;
 - `licenses/license-policy.json`;
 - `ArchiveLens-<version>.spdx.json`;
-- corresponding source archives required by the project's distribution obligations;
+- corresponding source archives required by the project's distribution obligations,
+  or a project-controlled prior-release asset reference with the exact SHA-256;
 - `SHA256SUMS.txt` covering the final release set.
 
 Release verification must fail if required licensing/SBOM artifacts are absent or if an

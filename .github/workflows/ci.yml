@@ -53,9 +53,9 @@ jobs:
       - run: python scripts/build_portable.py
       - run: python -m build --no-isolation --outdir dist/release
       - run: python scripts/package_release.py
-      - run: python scripts/verify_release.py dist/release/ArchiveLens-1.2.1-windows-x64.zip --run --expected-commit ${{ github.sha }}
+      - run: python scripts/verify_release.py dist/release/ArchiveLens-1.2.2-windows-x64.zip --run --expected-commit ${{ github.sha }}
       - run: python scripts/build_installer.py
-      - run: python scripts/verify_installer.py dist/release/ArchiveLens-1.2.1-setup-x64.exe --expected-commit ${{ github.sha }}
+      - run: python scripts/verify_installer.py dist/release/ArchiveLens-1.2.2-setup-x64.exe --expected-commit ${{ github.sha }}
       - run: python scripts/release_checksums.py
       - run: python scripts/verify_release_set.py dist/release --expected-commit ${{ github.sha }}
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

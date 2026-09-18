@@ -12,6 +12,16 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
 MAX_LICENSE_PATH_LENGTH = 96
+REUSED_RELEASE_SOURCES = {
+    (
+        "qtpdf",
+        "6.11.2",
+        "6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163",
+    ): (
+        "https://github.com/cam11505/ArchiveLens/releases/download/v1.2.1/"
+        "qtwebengine-everywhere-src-6.11.2.tar.xz"
+    )
+}
 
 
 def bundled_license_path(relative: PurePosixPath) -> Path:
@@ -84,7 +94,7 @@ def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     if expected_sha256 and digest != expected_sha256:
         raise RuntimeError(f"Official source checksum mismatch for {archive.name}")
-    return {
+    record = {
         "component": name,
         "version": version,
         "source_url": url,
@@ -93,6 +103,10 @@ def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
         "official_sha256_verified": bool(expected_sha256),
         "license_files": count,
     }
+    distribution_url = REUSED_RELEASE_SOURCES.get((name, version, digest))
+    if distribution_url:
+        record["distribution_url"] = distribution_url
+    return record
 
 
 def main() -> int:

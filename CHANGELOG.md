@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.2 — 2026-09-18
+
+- Fixed PDFs with an implicit transparent page background rendering as black text over
+  the dark reader surface by compositing QtPdf output onto an opaque white page.
+- Added a synthetic regression test covering transparent QtPdf corners and preserved
+  the existing annotation/render-size behavior.
+- Reused the identical Qt 6.11.2 corresponding-source asset from the project-controlled
+  v1.2.1 release by verified URL and SHA-256 instead of uploading another 580 MB copy.
+
 ## 1.2.1 — 2026-09-17
 
 - Enabled explicit QtPdf annotation and LCD-optimized rendering, with a deterministic

@@ -134,8 +134,20 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
             "source_archive": source_name,
             "sha256": source_digest,
         }
-        for component in ("Pillow", "qtpdf", "qtbase", "qtimageformats", "pyside-setup")
+        for component in ("Pillow", "qtbase", "qtimageformats", "pyside-setup")
     ]
+    sources.append(
+        {
+            "component": "qtpdf",
+            "version": "6.11.2",
+            "source_archive": "qtwebengine-everywhere-src-6.11.2.tar.xz",
+            "sha256": "6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163",
+            "distribution_url": (
+                "https://github.com/cam11505/ArchiveLens/releases/download/v1.2.1/"
+                "qtwebengine-everywhere-src-6.11.2.tar.xz"
+            ),
+        }
+    )
     portable = tmp_path / f"ArchiveLens-{__version__}-windows-x64.zip"
     create_portable(portable, sources=sources)
     build_info = {"version": __version__, "source_commit": "a" * 40, "development": False}
@@ -161,6 +173,31 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
     (tmp_path / source_name).write_bytes(b"tampered")
     with pytest.raises(ValueError, match="SHA-256"):
         verify_release_set(tmp_path, "a" * 40)
+
+
+def test_release_set_rejects_uncontrolled_or_duplicated_source_reference(tmp_path):
+    record = {
+        "component": "qtpdf",
+        "source_archive": "qtwebengine-everywhere-src-6.11.2.tar.xz",
+        "sha256": "6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163",
+        "distribution_url": "https://download.qt.io/source.tar.xz",
+    }
+    from scripts.verify_release_set import verify_distribution_source
+
+    with pytest.raises(ValueError, match="Invalid controlled source reference"):
+        verify_distribution_source(record, tmp_path)
+    record["distribution_url"] = (
+        "https://github.com/cam11505/ArchiveLens/releases/download/v1.2.1/"
+        "qtwebengine-everywhere-src-6.11.2.tar.xz"
+    )
+    record["version"] = "6.11.2"
+    record["sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="Invalid controlled source reference"):
+        verify_distribution_source(record, tmp_path)
+    record["sha256"] = "6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163"
+    (tmp_path / record["source_archive"]).write_bytes(b"duplicate")
+    with pytest.raises(ValueError, match="must not be duplicated"):
+        verify_distribution_source(record, tmp_path)
 
 
 def test_license_policy_rejects_unreviewed_runtime_dependency():

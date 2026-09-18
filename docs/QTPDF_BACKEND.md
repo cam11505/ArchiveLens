@@ -25,6 +25,11 @@ For v1.2.1, every page render uses explicit `QPdfDocumentRenderOptions` flags:
   grayscale, and halftone overrides remain disabled so document color and vector
   behavior are not forcibly changed.
 
+QtPdf may return transparent pixels for an implicit PDF page background. Since the
+ArchiveLens reader surface is dark, v1.2.2 composites every page and thumbnail render
+over opaque white before caching or display. This matches conventional PDF viewer paper
+semantics while retaining normal alpha blending for content and annotations.
+
 Official references:
 
 - <https://doc.qt.io/qtforpython-6/PySide6/QtPdf/QPdfDocument.html>

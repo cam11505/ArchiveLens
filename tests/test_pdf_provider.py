@@ -87,6 +87,7 @@ def test_pdf_provider_explicitly_renders_annotations_and_optimizes_for_lcd(tmp_p
         provider._document.pagePointSize(0), PageLoadRequest(render_size=(600, 600))
     )
     no_annotations = provider._document.render(0, target)
+    no_annotations = provider._composite_page_background(no_annotations)
     rendered = provider.load_page(page, PageLoadRequest(render_size=(600, 600))).image
     flags = provider._render_options().renderFlags()
 
@@ -94,6 +95,27 @@ def test_pdf_provider_explicitly_renders_annotations_and_optimizes_for_lcd(tmp_p
     assert flags & QPdfDocumentRenderOptions.RenderFlag.OptimizedForLcd
     assert rendered is not None
     assert rendered != no_annotations
+    provider.close()
+
+
+def test_pdf_provider_composites_transparent_page_background_over_white(tmp_path, qapp):
+    source = tmp_path / "implicit-page-background.pdf"
+    write_pdf_fixture(source, pages=1)
+    provider = PdfContentProvider()
+    provider.open(source)
+    page = provider.list_pages()[0]
+    target = provider._target_size(
+        provider._document.pagePointSize(0), PageLoadRequest(render_size=(600, 800))
+    )
+
+    raw = provider._document.render(0, target, provider._render_options())
+    rendered = provider.load_page(page, PageLoadRequest(render_size=(600, 800))).image
+
+    assert raw.hasAlphaChannel()
+    assert raw.pixelColor(0, 0).alpha() == 0
+    assert rendered is not None
+    assert not rendered.hasAlphaChannel()
+    assert rendered.pixelColor(0, 0).getRgb() == (255, 255, 255, 255)
     provider.close()
 
 
