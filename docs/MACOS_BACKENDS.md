@@ -81,8 +81,8 @@ Both source and frozen diagnostics reported:
 | Backend | macOS arm64 | Linux x64 | License/redistribution status | Required action |
 | --- | --- | --- | --- | --- |
 | Qt Core/Gui/Widgets | works | works | LGPL/commercial Qt terms already tracked for v1.2 | Keep deterministic plugin collection in the app bundle. |
-| QtPdf | works | works | Qt terms already tracked for v1.2 | Qualify real PDF fixtures in #45. |
-| Pillow raster codecs | works | works | Existing dependency notices apply | Qualify real AVIF/JP2/TIFF fixtures in #45. |
+| QtPdf | qualified in source and minimal-frozen modes | works | Qt terms already tracked for v1.2 | Package the qualified runtime in #46. |
+| Qt/Pillow raster codecs | qualified in source and minimal-frozen modes | works | Existing dependency notices apply | Package the qualified runtime/plugins in #46. |
 | ZIP/CBZ (`zipfile`/`pyzipper`) | works | works | Existing notices apply | No platform replacement indicated. |
 | 7Z (`py7zr`) | works | works | Existing notices apply | No platform replacement indicated. |
 | RAR/CBR provider | works | works in source/minimal-frozen qualification | Official UnRAR 7.23 source and complete non-FOSS license are pinned; libraries are built in CI | Go for #46 macOS packaging; Linux packaging remains deferred. |
@@ -123,6 +123,34 @@ Exact evidence is GitHub Actions RAR backend gate Run #4 at commit
 This Go clears #44 as the RAR prerequisite for #46. It does not approve the final app
 bundle, signing, notarization or release checks owned by #46 and later issues, and it does
 not expand Linux into a packaged release target.
+
+## Shipped media qualification
+
+Issue #45 qualifies the unchanged v1.2.2 decoder registry and QtPdf provider on the
+GitHub-hosted `macos-15` arm64 runner. GitHub Actions Run
+[35605782202](https://github.com/cam11505/ArchiveLens/actions/runs/35605782202) at
+commit `58af2a1ac76032a30474eb23764ac629d6719c08` passed the complete source suite and a
+dedicated source/minimal-frozen production-path diagnostic.
+
+Both diagnostic modes reported Python 3.12.10, PySide6/Qt 6.11.2 and Pillow 12.3.0.
+The frozen executable was a native `Mach-O 64-bit arm64` binary. The qualification
+verified:
+
+- JPEG (`.jpg`, `.jpeg`), PNG, WebP, BMP, GIF, TIFF/TIF, AVIF, and all shipped
+  JPEG 2000 suffixes
+  (`.jp2`, `.j2k`, `.j2c`) through `DEFAULT_DECODER_REGISTRY`;
+- full-size and thumbnail decoding, malformed-input rejection, the pre-decode pixel
+  guard, and AVIF orientation/alpha/ICC behavior;
+- all 12 shipped extensions through both the folder and ZIP content providers;
+- ordinary, 125-page, malformed, and password-protected PDFs through
+  `PdfContentProvider`, including missing/wrong/correct password behavior;
+- a bounded 2894 x 4096 (11,853,824-pixel) high-DPI render and the v1.2.2 opaque-white
+  page contract;
+- frozen runtime/plugin discovery with no QtWebEngine collection.
+
+HEIC/HEIF and JPEG XL remain absent and deferred exactly as recorded for v1.2.2.
+This qualification does not create a distributable `.app`; #46 owns application
+bundling and must repeat the applicable checks against the real bundle.
 
 ## Proven remediation boundaries
 
