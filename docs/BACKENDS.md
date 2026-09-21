@@ -29,6 +29,20 @@ The bundled license permits using and redistributing UnRAR components in softwar
 handling RAR archives, but prohibits recreating the proprietary compression algorithm.
 The exact text is shipped as licenses/UNRAR-LICENSE.txt.
 
+Issue #44 cross-platform qualification at commit
+`01d2f0b0438cfded5a0acbd75981e20a8b20bade` produced these verified binaries:
+
+- macOS arm64 `libunrar.dylib`:
+  `d03c4c020a6c75b830c5dedb24dc4300d0b49e6c85bdc13549e6f66c81b61a7f`;
+- Linux x86-64 `libunrar.so`:
+  `dfee3328fa0e1e05d2a2a1223d3dbe39fef125f806d4f853d62e79d96918ca9b`;
+- Windows x64 `UnRAR64.dll`:
+  `894b7d2db8d6363eb12f30c7b89f48eab9e71963b8b438675bdd64c12dd59bcc`.
+
+GitHub Actions RAR backend gate Run #4 passed source and minimal-frozen real-fixture reads
+on all three platforms. Linux evidence qualifies the runtime path only; Linux packaging is
+not a v1.3 target.
+
 The adapter is based on the packed UnRAR ABI and documented callbacks. Platform-specific
 library discovery, loader and callback calling convention are isolated behind
 `RarBackend`; archive-facing provider, worker and UI semantics do not branch by OS.

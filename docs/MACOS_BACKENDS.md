@@ -85,7 +85,7 @@ Both source and frozen diagnostics reported:
 | Pillow raster codecs | works | works | Existing dependency notices apply | Qualify real AVIF/JP2/TIFF fixtures in #45. |
 | ZIP/CBZ (`zipfile`/`pyzipper`) | works | works | Existing notices apply | No platform replacement indicated. |
 | 7Z (`py7zr`) | works | works | Existing notices apply | No platform replacement indicated. |
-| RAR/CBR provider | qualification pending | qualification pending | Official UnRAR 7.23 source and complete non-FOSS license are pinned; libraries are built in CI | #44 must pass real source/frozen fixtures before the formal Go decision. |
+| RAR/CBR provider | works | works in source/minimal-frozen qualification | Official UnRAR 7.23 source and complete non-FOSS license are pinned; libraries are built in CI | Go for #46 macOS packaging; Linux packaging remains deferred. |
 | PyInstaller minimal frozen layout | works | works | Build-only diagnostic | Replace with release-quality `.app` packaging in #46. |
 
 ## RAR/CBR evidence and decision
@@ -102,9 +102,27 @@ The official source/library is compiled per architecture behind the existing bou
 callback/session contract. Passwords remain memory-only, normal reads stream the requested
 member through callbacks, and no command-line or whole-archive extraction path is added.
 
-Decision status: **pending CI qualification**. The v1.3 release gate remains blocked until
-the dedicated Windows x64, macOS arm64 and Linux x64 source/frozen jobs pass and the exact
-evidence is recorded. A failure remains a No-Go; it does not make RAR optional.
+Decision: **Go** for the v1.3 macOS arm64 RAR backend.
+
+Exact evidence is GitHub Actions RAR backend gate Run #4 at commit
+`01d2f0b0438cfded5a0acbd75981e20a8b20bade`:
+
+- Windows x64, macOS arm64 and Linux x64 all passed the complete pytest suite, source
+  diagnostic, real RAR3/RAR5 solid/encrypted reads, minimal-frozen build and frozen reads.
+- macOS `libunrar.dylib` is a Mach-O arm64 shared library with SHA-256
+  `d03c4c020a6c75b830c5dedb24dc4300d0b49e6c85bdc13549e6f66c81b61a7f`.
+- Linux `libunrar.so` is an ELF x86-64 shared library with SHA-256
+  `dfee3328fa0e1e05d2a2a1223d3dbe39fef125f806d4f853d62e79d96918ca9b`.
+- Windows retained the official x64 DLL with SHA-256
+  `894b7d2db8d6363eb12f30c7b89f48eab9e71963b8b438675bdd64c12dd59bcc`.
+- All three diagnostics produced the identical fixture payload digest
+  `9a6803dc21766df867c06462517045a58c0dd8f3ccde4228648fd3f6d1571f53`.
+- Source version 7.23, source archive SHA-256, license classification and built-library
+  metadata are preserved in each uploaded `UNRAR-BACKEND.json`.
+
+This Go clears #44 as the RAR prerequisite for #46. It does not approve the final app
+bundle, signing, notarization or release checks owned by #46 and later issues, and it does
+not expand Linux into a packaged release target.
 
 ## Proven remediation boundaries
 
