@@ -2,17 +2,6 @@ name: v1.3 RAR backend gate
 
 on:
   workflow_dispatch:
-  push:
-    branches: ["codex/v1.3-issue-44*"]
-    paths:
-      - ".github/workflows/v13-rar-backend.yml"
-      - "constraints-build.txt"
-      - "pyproject.toml"
-      - "scripts/prepare_backends.py"
-      - "scripts/V13RarDiagnostic.spec"
-      - "scripts/v13_platform_diagnostic.py"
-      - "src/**"
-      - "tests/**"
   pull_request:
     paths:
       - ".github/workflows/v13-rar-backend.yml"
