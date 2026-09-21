@@ -1,0 +1,72 @@
+name: v1.3 macOS media qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/v13-media-qualification.yml"
+      - "constraints-build.txt"
+      - "pyproject.toml"
+      - "scripts/V13MediaQualification.spec"
+      - "scripts/v13_media_qualification.py"
+      - "src/archivelens/content/**"
+      - "src/archivelens/image/**"
+      - "src/archivelens/diagnostic_fixtures.py"
+      - "src/archivelens/platform_paths.py"
+      - "tests/test_v13_media_qualification.py"
+      - "docs/IMAGE_BACKENDS.md"
+      - "docs/MACOS_BACKENDS.md"
+      - "docs/QTPDF_BACKEND.md"
+
+permissions:
+  contents: read
+
+jobs:
+  macos-arm64-source-and-frozen:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -c constraints-build.txt -e ".[dev,build]"
+      - run: python -m ruff check src tests scripts
+      - run: python -m ruff format --check src tests scripts
+      - run: python -m pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Source media qualification
+        run: >-
+          python scripts/v13_media_qualification.py
+          --output outputs/v13-media/source.json
+          --require-machine arm64
+          --require-version 1.2.2
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Build frozen media qualification
+        run: python -m PyInstaller --noconfirm --clean scripts/V13MediaQualification.spec
+      - name: Run frozen media qualification
+        run: >-
+          ./dist/ArchiveLens-v13-media/ArchiveLens-v13-media
+          --output outputs/v13-media/frozen.json
+          --require-machine arm64
+          --require-version 1.2.2
+          --require-frozen
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Verify frozen architecture and excluded WebEngine
+        run: |
+          file dist/ArchiveLens-v13-media/ArchiveLens-v13-media | tee outputs/v13-media/executable.txt
+          lipo dist/ArchiveLens-v13-media/ArchiveLens-v13-media -verify_arch arm64
+          if find dist/ArchiveLens-v13-media -iname '*QtWebEngine*' | grep -q .; then
+            echo "QtWebEngine must not be collected by the media diagnostic" >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: ArchiveLens-v13-media-macos-arm64
+          path: |
+            outputs/v13-media/*
+            build/V13MediaQualification/warn-V13MediaQualification.txt
+          if-no-files-found: error
