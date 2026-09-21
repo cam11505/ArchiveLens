@@ -110,3 +110,16 @@ Pillow `_avif`/`_imaging`, Qt `qtiff.dll`, Pillow's license, and the verified
 `pillow-12.3.0.tar.gz` source (SHA-256
 `3b8182a766685eaa002637e28b4ec8d6b18819a0c71f579bf0dbaa5830297cce`).
 Release hardening in #30 will repeat this against the final clean v1.2 commit.
+
+## macOS arm64 qualification
+
+Issue #45 retained the same Qt/Pillow decoder boundary and exact v1.2.2 dependency
+versions. GitHub-hosted macOS 15 arm64 source and minimal-frozen diagnostics passed
+all shipped suffixes in full-size and thumbnail paths, folder and ZIP sources,
+malformed-input handling, the pixel guard, and AVIF orientation/alpha/ICC checks.
+The frozen diagnostic is intentionally not a release artifact and excludes
+QtWebEngine. HEIC/HEIF and JXL remain deferred; no new backend was introduced.
+
+Evidence: GitHub Actions Run
+[35605782202](https://github.com/cam11505/ArchiveLens/actions/runs/35605782202) at
+commit `58af2a1ac76032a30474eb23764ac629d6719c08`.

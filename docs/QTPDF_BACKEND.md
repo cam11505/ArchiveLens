@@ -155,3 +155,17 @@ Its SHA-256 is
 which matches Qt's official Metalink. The source archive is included in release
 checksums. Final #30 hardening repeats portable and production-installer
 verification from a clean v1.2 commit.
+
+## macOS arm64 qualification
+
+Issue #45 exercised the unchanged `PdfContentProvider` in source and minimal-frozen
+modes on GitHub-hosted macOS 15 arm64. Ordinary, 125-page, malformed and standard
+password PDFs passed, including missing/wrong/correct password behavior, thumbnails,
+a bounded 2894 x 4096 high-DPI render, explicit rendering policy, and opaque-white
+page compositing. The frozen executable was native arm64 and resolved QtPdf from its
+minimal frozen layout.
+
+Evidence: GitHub Actions Run
+[35605782202](https://github.com/cam11505/ArchiveLens/actions/runs/35605782202) at
+commit `58af2a1ac76032a30474eb23764ac629d6719c08`. Final `.app` inclusion remains owned
+by #46.
