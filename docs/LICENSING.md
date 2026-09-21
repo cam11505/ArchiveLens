@@ -12,7 +12,7 @@ texts distributed with the project and its dependencies remain authoritative.
   runtime components, or other third-party software bundled with an artifact.
 - Most bundled dependencies are FOSS under licenses such as LGPL, MIT, BSD, HPND,
   Apache-2.0, and the PSF license.
-- The Windows distribution currently includes **UnRAR64.dll**, which is redistributed
+- Distributions include an official **UnRAR 7.23 native library**, which is redistributed
   under the upstream UnRAR freeware license. ArchiveLens does **not** classify this
   component as FOSS because its license contains use/reverse-engineering restrictions,
   including restrictions related to recreating the proprietary RAR compression
@@ -59,7 +59,7 @@ SBOM.
 | backports.zstd | FOSS | PSF-2.0 plus bundled Zstandard notices |
 | OpenSSL when bundled by the runtime | FOSS | Apache-2.0 |
 | PyInstaller bootloader | FOSS with distribution exception | GPL-2.0-or-later plus PyInstaller bootloader exception |
-| UnRAR64.dll | Redistributable, not classified by ArchiveLens as FOSS | Upstream UnRAR freeware license |
+| UnRAR 7.23 native library | Redistributable, not classified by ArchiveLens as FOSS | Upstream UnRAR freeware license |
 | Microsoft Visual C++ runtime | Proprietary redistributable | Microsoft runtime terms |
 | Inno Setup installer engine | Separately licensed installer component | Inno Setup license |
 
@@ -98,9 +98,10 @@ Official Qt references:
 
 ## UnRAR status
 
-ArchiveLens currently bundles the official UnRAR library on Windows so RAR/CBR files can
-be read without invoking a password-bearing command line or extracting an entire book to
-a visible temporary directory.
+ArchiveLens uses the official UnRAR 7.23 library: the official DLL on Windows and libraries
+built from the pinned official portable source on macOS/Linux. This reads RAR/CBR without
+invoking a password-bearing command line or extracting an entire book to a visible
+temporary directory.
 
 UnRAR is redistributed under its own upstream terms. The license permits redistribution
 of UnRAR components subject to restrictions and expressly restricts use/reverse
@@ -109,8 +110,9 @@ are not an unrestricted open-source license, ArchiveLens classifies the componen
 `redistributable-non-foss` in `license-policy.json`.
 
 This classification does **not** change the MIT license of ArchiveLens source code.
-A future RAR backend may be evaluated separately if it can preserve ArchiveLens security,
-password-privacy, resource-bound, compatibility, and packaging requirements.
+The cross-platform backend retains ArchiveLens security, password-privacy, resource-bound,
+compatibility and deterministic source/frozen discovery requirements. Linux qualification
+does not imply a supported Linux package.
 
 Upstream reference: <https://www.rarlab.com/license.htm>
 

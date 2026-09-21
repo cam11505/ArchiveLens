@@ -85,30 +85,44 @@ Both source and frozen diagnostics reported:
 | Pillow raster codecs | works | works | Existing dependency notices apply | Qualify real AVIF/JP2/TIFF fixtures in #45. |
 | ZIP/CBZ (`zipfile`/`pyzipper`) | works | works | Existing notices apply | No platform replacement indicated. |
 | 7Z (`py7zr`) | works | works | Existing notices apply | No platform replacement indicated. |
-| Current RAR/CBR provider | replacement required | replacement required | Windows UnRAR DLL license is recorded in `docs/BACKENDS.md`; no non-Windows binary is currently shipped | Implement a platform-neutral native-library boundary and qualify an arm64 backend in #44. |
+| RAR/CBR provider | works | works in source/minimal-frozen qualification | Official UnRAR 7.23 source and complete non-FOSS license are pinned; libraries are built in CI | Go for #46 macOS packaging; Linux packaging remains deferred. |
 | PyInstaller minimal frozen layout | works | works | Build-only diagnostic | Replace with release-quality `.app` packaging in #46. |
 
 ## RAR/CBR evidence and decision
 
-The current provider cannot be used on macOS or Linux:
+Issue #44 replaces the Windows-only loading path with a platform-neutral boundary:
 
-- availability is explicitly restricted to `sys.platform == "win32"`;
-- runtime discovery is hard-coded to `native/UnRAR64.dll`;
-- the ABI loader is designed around the Windows UnRAR DLL;
-- both non-Windows source and frozen diagnostics therefore reported
-  `rar.available = false`.
+- Windows loads the pinned official 7.23 `UnRAR64.dll` with the Windows ABI;
+- macOS builds `libunrar.dylib` from pinned official 7.23 portable source;
+- Linux builds `libunrar.so` from the same source for source/runtime qualification;
+- all platforms use deterministic `outputs/backends` and frozen `native` discovery;
+- real RAR3/RAR5, solid and encrypted reads run in both source and minimal-frozen modes.
 
-Candidate direction for #44 is the official UnRAR source/library compiled for
-each supported architecture behind the existing bounded callback/session
-contract. This is a candidate, not an approval: its macOS arm64 binary,
-password/solid/RAR4/RAR5 behavior, resource limits, frozen discovery, exact
-license text, and redistribution evidence still require dedicated tests.
+The official source/library is compiled per architecture behind the existing bounded
+callback/session contract. Passwords remain memory-only, normal reads stream the requested
+member through callbacks, and no command-line or whole-archive extraction path is added.
 
-Decision for the current backend: **No-Go on macOS arm64**. Do not ship the
-Windows-only implementation or silently make RAR optional. The v1.3 release
-gate remains blocked until #44 produces an approved macOS arm64 backend and a
-formal Go decision. This does not block #43's narrow platform seams or #45's
-codec qualification.
+Decision: **Go** for the v1.3 macOS arm64 RAR backend.
+
+Exact evidence is GitHub Actions RAR backend gate Run #4 at commit
+`01d2f0b0438cfded5a0acbd75981e20a8b20bade`:
+
+- Windows x64, macOS arm64 and Linux x64 all passed the complete pytest suite, source
+  diagnostic, real RAR3/RAR5 solid/encrypted reads, minimal-frozen build and frozen reads.
+- macOS `libunrar.dylib` is a Mach-O arm64 shared library with SHA-256
+  `d03c4c020a6c75b830c5dedb24dc4300d0b49e6c85bdc13549e6f66c81b61a7f`.
+- Linux `libunrar.so` is an ELF x86-64 shared library with SHA-256
+  `dfee3328fa0e1e05d2a2a1223d3dbe39fef125f806d4f853d62e79d96918ca9b`.
+- Windows retained the official x64 DLL with SHA-256
+  `894b7d2db8d6363eb12f30c7b89f48eab9e71963b8b438675bdd64c12dd59bcc`.
+- All three diagnostics produced the identical fixture payload digest
+  `9a6803dc21766df867c06462517045a58c0dd8f3ccde4228648fd3f6d1571f53`.
+- Source version 7.23, source archive SHA-256, license classification and built-library
+  metadata are preserved in each uploaded `UNRAR-BACKEND.json`.
+
+This Go clears #44 as the RAR prerequisite for #46. It does not approve the final app
+bundle, signing, notarization or release checks owned by #46 and later issues, and it does
+not expand Linux into a packaged release target.
 
 ## Proven remediation boundaries
 

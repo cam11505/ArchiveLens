@@ -90,7 +90,7 @@ def verify_archive(
             (
                 component
                 for component in policy.get("manual_components", [])
-                if component.get("name") == "UnRAR64.dll"
+                if component.get("name") == "UnRAR native library"
             ),
             None,
         )

@@ -1,11 +1,11 @@
-import sys
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
 
 from archivelens import config
 from archivelens.archive.base import ArchiveEntry, ArchiveProvider
 from archivelens.archive.capabilities import ArchiveCapabilities, RandomAccess
-from archivelens.archive.unrar import RarSession, dll_path
+from archivelens.archive.rar_backend import backend_available
+from archivelens.archive.unrar import RarSession
 from archivelens.errors import (
     ArchiveNotOpenError,
     CorruptedArchiveError,
@@ -21,7 +21,7 @@ class RarArchiveProvider(ArchiveProvider):
         frozenset({".rar", ".cbr"}),
         supports_passwords=True,
         random_access=RandomAccess.EXPENSIVE,
-        available=sys.platform == "win32" and dll_path().is_file(),
+        available=backend_available(),
     )
 
     def __init__(self):

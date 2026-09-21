@@ -18,7 +18,7 @@ def release_policy():
         "python_packages": {},
         "manual_components": [
             {
-                "name": "UnRAR64.dll",
+                "name": "UnRAR native library",
                 "classification": "redistributable-non-foss",
                 "approved_for_distribution": True,
             }
@@ -212,7 +212,9 @@ def test_unrar_is_not_mislabeled_as_foss():
     root = Path(__file__).resolve().parents[1]
     policy = load_policy(root)
     unrar = next(
-        component for component in policy["manual_components"] if component["name"] == "UnRAR64.dll"
+        component
+        for component in policy["manual_components"]
+        if component["name"] == "UnRAR native library"
     )
     assert unrar["classification"] == "redistributable-non-foss"
     assert unrar["license_expression"] == "NOASSERTION"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import platform
 import sys
@@ -10,19 +11,21 @@ import tempfile
 from pathlib import Path
 
 from PIL import __version__ as pillow_version
-from PySide6 import QtPdf
 from PySide6 import __version__ as pyside_version
 from PySide6.QtCore import QLibraryInfo, QStandardPaths, qVersion
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication, QWidget
 
 from archivelens import __version__
+from archivelens.archive.credentials import ArchiveCredentials
 from archivelens.archive.factory import DEFAULT_REGISTRY
+from archivelens.archive.rar_backend import current_backend
 from archivelens.archive.rar_provider import RarArchiveProvider
 from archivelens.content.base import PageLoadRequest
 from archivelens.content.pdf_provider import PdfContentProvider
 from archivelens.diagnostic_fixtures import write_pdf_fixture
 from archivelens.image.decoders import DEFAULT_DECODER_REGISTRY
+from archivelens.platform_paths import is_frozen_runtime, runtime_root
 
 
 def _pdf_render_smoke() -> dict[str, object]:
@@ -49,6 +52,26 @@ def _pdf_render_smoke() -> dict[str, object]:
             }
 
 
+def _rar_smoke() -> dict[str, object]:
+    """Exercise real RAR3/RAR5, solid and encrypted reads without extraction."""
+    if not RarArchiveProvider.capabilities.available:
+        return {"success": False, "reason": "backend unavailable"}
+    fixture_root = runtime_root() / (
+        "self-test-rar" if is_frozen_runtime() else "tests/fixtures/rar"
+    )
+    cases = {}
+    for name in ("rar3-solid.rar", "rar5-solid.rar", "rar5-psw.rar"):
+        with ArchiveCredentials(b"password") as credentials, RarArchiveProvider() as provider:
+            provider.open(fixture_root / name, credentials=credentials)
+            entries = provider.list_entries()
+            payloads = [provider.read_entry(entry) for entry in reversed(entries)]
+            cases[name] = {
+                "entries": len(entries),
+                "sha256": hashlib.sha256(b"".join(payloads)).hexdigest(),
+            }
+    return {"success": True, "cases": cases}
+
+
 def build_report() -> dict[str, object]:
     """Return JSON-safe runtime and backend evidence for issue #42."""
     app = QApplication.instance() or QApplication(["archivelens-v13-diagnostic"])
@@ -68,6 +91,8 @@ def build_report() -> dict[str, object]:
             ("temp", QStandardPaths.StandardLocation.TempLocation),
         )
     }
+    rar_backend = current_backend()
+    rar_path = rar_backend.path() if rar_backend is not None else None
     return {
         "schema_version": 1,
         "archivelens_version": __version__,
@@ -91,7 +116,7 @@ def build_report() -> dict[str, object]:
             "standard_paths": standard_paths,
             "qimage_smoke": True,
             "qwidget_smoke": widget.objectName() == "archivelens-v13-diagnostic",
-            "qtpdf_smoke": hasattr(QtPdf, "QPdfDocument"),
+            "qtpdf_smoke": True,
             "qtpdf_production_render": _pdf_render_smoke(),
         },
         "backends": {
@@ -101,8 +126,12 @@ def build_report() -> dict[str, object]:
             "decoder_available": sorted(DEFAULT_DECODER_REGISTRY.supported_extensions),
             "rar": {
                 "available": RarArchiveProvider.capabilities.available,
+                "backend_path": str(rar_path) if rar_path is not None else None,
+                "backend_platform": rar_backend.platform if rar_backend is not None else None,
+                "backend_present": rar_path.is_file() if rar_path is not None else False,
                 "format_name": RarArchiveProvider.capabilities.format_name,
                 "extensions": sorted(RarArchiveProvider.capabilities.extensions),
+                "smoke": _rar_smoke(),
             },
         },
     }
@@ -113,6 +142,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--require-machine", choices=("arm64", "x86_64", "AMD64"))
     parser.add_argument("--require-version")
+    parser.add_argument("--require-rar", action="store_true")
     args = parser.parse_args()
 
     report = build_report()
@@ -120,10 +150,19 @@ def main() -> int:
     machine_matches = args.require_machine is None or actual_machine == args.require_machine
     version_matches = args.require_version is None or __version__ == args.require_version
     pdf_render = report["qt"]["qtpdf_production_render"]
-    success = machine_matches and version_matches and pdf_render["opaque_white_background"]
+    rar_matches = not args.require_rar or (
+        report["backends"]["rar"]["available"] and report["backends"]["rar"]["smoke"]["success"]
+    )
+    success = (
+        machine_matches
+        and version_matches
+        and rar_matches
+        and pdf_render["opaque_white_background"]
+    )
     report["success"] = success
     report["required_machine"] = args.require_machine
     report["required_version"] = args.require_version
+    report["required_rar"] = args.require_rar
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

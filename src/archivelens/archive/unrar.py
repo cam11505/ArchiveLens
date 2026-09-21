@@ -1,10 +1,10 @@
-"""UnRAR 7.21 x64 ABI. Test operations stream bytes via callbacks; never extract."""
+"""Portable UnRAR 7.23 ABI. Test operations stream bytes via callbacks; never extract."""
 
 import ctypes as c
-import sys
 from pathlib import Path
 
 from archivelens import config
+from archivelens.archive.rar_backend import RarBackend, current_backend
 from archivelens.errors import (
     ArchiveAccessError,
     BadPasswordError,
@@ -14,16 +14,10 @@ from archivelens.errors import (
     ResourceLimitError,
     UnsupportedCompressionError,
 )
-from archivelens.platform_paths import native_backend_path
 
-
-def dll_path():
-    return native_backend_path("UnRAR64.dll")
-
-
-CALLBACK = getattr(c, "WINFUNCTYPE", c.CFUNCTYPE)(
-    c.c_int, c.c_uint, c.c_ssize_t, c.c_ssize_t, c.c_ssize_t
-)
+_DEFAULT_BACKEND = current_backend()
+_CALLBACK_FACTORY = _DEFAULT_BACKEND.callback_factory if _DEFAULT_BACKEND else c.CFUNCTYPE
+CALLBACK = _CALLBACK_FACTORY(c.c_int, c.c_uint, c.c_ssize_t, c.c_ssize_t, c.c_ssize_t)
 U = c.c_uint
 
 
@@ -100,10 +94,11 @@ class OpenData(c.Structure):
 
 
 class RarSession:
-    def __init__(self, path, credentials, extract=False):
-        if sys.platform != "win32" or not dll_path().is_file():
+    def __init__(self, path, credentials, extract=False, *, backend: RarBackend | None = None):
+        backend = current_backend() if backend is None else backend
+        if backend is None or not backend.available:
             raise ProviderUnavailableError()
-        self.dll = c.WinDLL(str(dll_path()))
+        self.dll = backend.load()
         self.dll.RAROpenArchiveEx.argtypes = [c.POINTER(OpenData)]
         self.dll.RAROpenArchiveEx.restype = c.c_void_p
         self.dll.RARReadHeaderEx.argtypes = [c.c_void_p, c.POINTER(Header)]
@@ -141,15 +136,19 @@ class RarSession:
                 if self.password_requests > 8:
                     self.failure = BadPasswordError
                     return -1
-                data = (
-                    password.decode("utf-8").encode("utf-16-le") + b"\0\0"
-                    if msg == 4
-                    else password + b"\0"
-                )
-                if len(data) > p2 * (2 if msg == 4 else 1):
-                    self.failure = BadPasswordError
-                    return -1
-                c.memmove(p1, data, len(data))
+                if msg == 4:
+                    decoded = password.decode("utf-8")
+                    if len(decoded) + 1 > p2:
+                        self.failure = BadPasswordError
+                        return -1
+                    buffer = c.create_unicode_buffer(decoded)
+                    c.memmove(p1, buffer, c.sizeof(buffer))
+                else:
+                    data = password + b"\0"
+                    if len(data) > p2:
+                        self.failure = BadPasswordError
+                        return -1
+                    c.memmove(p1, data, len(data))
                 return 1
             if msg == 1:
                 if self.output is not None:
