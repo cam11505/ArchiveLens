@@ -30,6 +30,6 @@ backend paths, and Qt writable locations. Production backend discovery and the
 packaged self-test use the same helpers. A frozen runtime without a bundle root
 fails explicitly instead of searching the current directory or `PATH`.
 
-Current Windows UnRAR discovery remains behavior-compatible. #44 will add the
-platform-neutral RAR ABI/backend boundary and macOS arm64 implementation; this
-seam does not approve or silently enable a non-Windows RAR backend.
+UnRAR discovery uses the same source/frozen path seam through a platform-neutral
+`RarBackend` boundary. Windows loads `UnRAR64.dll`; macOS and Linux load their bundled
+native libraries. Availability still fails closed when the selected library is absent.

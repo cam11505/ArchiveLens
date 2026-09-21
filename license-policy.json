@@ -153,8 +153,13 @@
       "license_label": "Apache License 2.0"
     },
     {
-      "name": "UnRAR64.dll",
-      "version": "7.21",
+      "name": "UnRAR native library",
+      "version": "7.23",
+      "artifacts": [
+        "UnRAR64.dll",
+        "libunrar.dylib",
+        "libunrar.so"
+      ],
       "scope": "runtime",
       "approved_for_distribution": true,
       "classification": "redistributable-non-foss",

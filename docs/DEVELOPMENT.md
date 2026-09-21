@@ -29,7 +29,9 @@ python -m ruff format --check src tests scripts
 python -m archivelens --self-test-report outputs/self-test.json
 ```
 
-On Windows, run `prepare_backends.py` before backend tests/builds. The self-test exercises
+Run `prepare_backends.py` before backend tests/builds. It fetches the verified official
+DLL on Windows and compiles the verified official portable source on macOS/Linux. The
+self-test exercises
 encrypted ZIP/7Z/RAR, AVIF/JP2/TIFF, folder traversal, QtPdf normal/password/resource paths,
 fit/trim, animation, thumbnails, reading-state safety and source immutability.
 

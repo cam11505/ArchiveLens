@@ -1,0 +1,108 @@
+name: v1.3 RAR backend gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["codex/v1.3-issue-44*"]
+    paths:
+      - ".github/workflows/v13-rar-backend.yml"
+      - "constraints-build.txt"
+      - "pyproject.toml"
+      - "scripts/prepare_backends.py"
+      - "scripts/V13RarDiagnostic.spec"
+      - "scripts/v13_platform_diagnostic.py"
+      - "src/**"
+      - "tests/**"
+  pull_request:
+    paths:
+      - ".github/workflows/v13-rar-backend.yml"
+      - "scripts/prepare_backends.py"
+      - "scripts/v13_platform_diagnostic.py"
+      - "src/archivelens/archive/**"
+      - "tests/test_rar*"
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-frozen-rar:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-x64
+            required_machine: AMD64
+            library: UnRAR64.dll
+          - os: ubuntu-latest
+            artifact: linux-x64
+            required_machine: x86_64
+            library: libunrar.so
+          - os: macos-15
+            artifact: macos-arm64
+            required_machine: arm64
+            library: libunrar.dylib
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: Linux Qt runtime dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
+      - run: python -m pip install -c constraints-build.txt -e ".[dev,build]"
+      - name: Prepare pinned UnRAR backend
+        run: python scripts/prepare_backends.py
+      - name: Record Unix library architecture
+        if: runner.os != 'Windows'
+        run: file outputs/backends/${{ matrix.library }} | tee outputs/backends/architecture.txt
+      - name: Verify native macOS arm64 library
+        if: runner.os == 'macOS'
+        run: lipo -verify_arch arm64 outputs/backends/libunrar.dylib
+      - run: python -m ruff check src tests scripts
+      - run: python -m ruff format --check src tests scripts
+      - run: python -m pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Source RAR diagnostic
+        run: >-
+          python scripts/v13_platform_diagnostic.py
+          --output outputs/v13-rar/source.json
+          --require-machine ${{ matrix.required_machine }}
+          --require-version 1.2.2
+          --require-rar
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Build minimal frozen RAR diagnostic
+        run: python -m PyInstaller --noconfirm --clean scripts/V13RarDiagnostic.spec
+      - name: Run frozen RAR diagnostic on Windows
+        if: runner.os == 'Windows'
+        run: >-
+          dist/ArchiveLens-v13-rar/ArchiveLens-v13-rar.exe
+          --output outputs/v13-rar/frozen.json
+          --require-machine ${{ matrix.required_machine }}
+          --require-version 1.2.2
+          --require-rar
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Run frozen RAR diagnostic on Unix
+        if: runner.os != 'Windows'
+        run: >-
+          ./dist/ArchiveLens-v13-rar/ArchiveLens-v13-rar
+          --output outputs/v13-rar/frozen.json
+          --require-machine ${{ matrix.required_machine }}
+          --require-version 1.2.2
+          --require-rar
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: ArchiveLens-v13-rar-${{ matrix.artifact }}
+          path: |
+            outputs/v13-rar/*
+            outputs/backends/UNRAR-BACKEND.json
+            outputs/backends/architecture.txt
+            build/ArchiveLens-v13-rar/warn-ArchiveLens-v13-rar.txt
+          if-no-files-found: warn

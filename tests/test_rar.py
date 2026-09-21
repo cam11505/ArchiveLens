@@ -9,7 +9,7 @@ from archivelens.errors import BadPasswordError, PasswordRequiredError
 
 ROOT = Path(__file__).parent / "fixtures" / "rar"
 pytestmark = pytest.mark.skipif(
-    not RarArchiveProvider.capabilities.available, reason="Bundled Windows UnRAR DLL required"
+    not RarArchiveProvider.capabilities.available, reason="Bundled UnRAR library required"
 )
 
 

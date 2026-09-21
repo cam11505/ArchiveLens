@@ -5,7 +5,9 @@
 | Plain/ZipCrypto ZIP/CBZ | Python 3.12 zipfile | PSF | Python runtime |
 | AES ZIP/CBZ | pyzipper 0.4.0 | MIT + inherited Python license | pycryptodomex 3.23.0 (BSD/public domain) |
 | 7Z | py7zr 1.1.3 | LGPL-2.1-or-later | BCJ, PPMd, inflate64, Brotli, Zstandard |
-| RAR/CBR (Windows x64) | official UnRAR DLL 7.21 | UnRAR DLL freeware license | UnRAR64.dll |
+| RAR/CBR (Windows x64) | official UnRAR DLL 7.23 | UnRAR freeware license | UnRAR64.dll |
+| RAR/CBR (macOS arm64) | official portable UnRAR source 7.23 | UnRAR freeware license | libunrar.dylib |
+| RAR/CBR (Linux x64 source/runtime qualification) | official portable UnRAR source 7.23 | UnRAR freeware license | libunrar.so |
 
 Exact transitive versions are pinned in constraints-build.txt and recorded in
 licenses/archive-backends.json. py7zr, pybcj, pyppmd, inflate64 and multivolumefile
@@ -18,19 +20,23 @@ reverse engineering to debug library modifications is permitted.
 
 ## UnRAR spike outcome
 
-Official SDK: https://www.rarlab.com/rar/unrardll-721.exe (7.21 stable).
-SDK SHA-256: e1dd2126d13dc75aa7c0c1a3964176fb3c8f728bbccfb0ce129f3a6c02542c1d.
-x64 DLL SHA-256: 4b4a5cf24a5d60102f31b9d0c591064085ea9ac2336dd31c4bee483091dcbc9f.
-The downloaded SDK had a valid win.rar GmbH Authenticode signature. The bundled
-SDK license permits free use of unrar.dll in software handling RAR archives.
+Windows SDK: https://www.rarlab.com/rar/unrardll-723.exe (7.23 stable).
+SDK SHA-256: 68b064b34691988158c4126d3cf422f4e74a7d1d618c26bafc93b4e502b88b55.
+x64 DLL SHA-256: 894b7d2db8d6363eb12f30c7b89f48eab9e71963b8b438675bdd64c12dd59bcc.
+Portable source: https://www.rarlab.com/rar/unrarsrc-7.2.3.tar.gz.
+Source SHA-256: 3995af0aa32b1505a566da053725551a1f0698dc42b2fdf7ba7d65db0d004e33.
+The bundled license permits using and redistributing UnRAR components in software
+handling RAR archives, but prohibits recreating the proprietary compression algorithm.
 The exact text is shipped as licenses/UNRAR-LICENSE.txt.
 
-The adapter is based on the SDK's packed unrar.h ABI and documented callbacks.
+The adapter is based on the packed UnRAR ABI and documented callbacks. Platform-specific
+library discovery, loader and callback calling convention are isolated behind
+`RarBackend`; archive-facing provider, worker and UI semantics do not branch by OS.
 RAR_TEST + UCM_PROCESSDATA provides single-member bytes without extraction;
 UCM_NEEDPASSWORDW provides an in-process password buffer, never command arguments.
 Missing/bad password use DLL error codes. Multipart, link and excessive-dictionary
 cases are rejected/skipped. Callback failures are converted after returning to Python.
-No dependence on WinRAR installations, registry discovery or system PATH.
+No dependence on WinRAR, Homebrew, MacPorts, registry discovery or system PATH.
 
 Local real-DLL tests passed for pre-RAR5/RAR4-compatible solid archives, RAR5 solid,
 CRC, encrypted data, encrypted headers and Unicode names. Small ISC-licensed rarfile

@@ -31,7 +31,7 @@ handles are released. No provider writes source data or persists credentials.
 
 `ArchiveProviderRegistry` is the shared selection boundary for the worker, CLI,
 file dialog and drag/drop. The default registry enables ZIP/CBZ and 7Z; RAR/CBR is available when the
-bundled Windows UnRAR DLL is present. Backend details are in BACKENDS.md.
+bundled platform UnRAR library is present. Backend details are in BACKENDS.md.
 
 ## Adding a backend
 
