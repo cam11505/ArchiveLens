@@ -48,7 +48,7 @@ jobs:
         run: file outputs/backends/${{ matrix.library }} | tee outputs/backends/architecture.txt
       - name: Verify native macOS arm64 library
         if: runner.os == 'macOS'
-        run: lipo -verify_arch arm64 outputs/backends/libunrar.dylib
+        run: lipo outputs/backends/libunrar.dylib -verify_arch arm64
       - run: python -m ruff check src tests scripts
       - run: python -m ruff format --check src tests scripts
       - run: python -m pytest -q

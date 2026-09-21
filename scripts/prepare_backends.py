@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -25,10 +27,28 @@ def digest(path: Path) -> str:
 
 
 def download(url: str, expected_sha256: str, destination: Path) -> None:
-    if not destination.is_file():
-        urllib.request.urlretrieve(url, destination)
-    if digest(destination) != expected_sha256:
-        raise SystemExit(f"Official download checksum mismatch: {destination.name}")
+    if destination.is_file() and digest(destination) == expected_sha256:
+        return
+    destination.unlink(missing_ok=True)
+    partial = destination.with_suffix(destination.suffix + ".part")
+    request = urllib.request.Request(url, headers={"User-Agent": "ArchiveLens backend fetch"})
+    for attempt in range(1, 4):
+        partial.unlink(missing_ok=True)
+        try:
+            with (
+                urllib.request.urlopen(request, timeout=90) as response,
+                partial.open("wb") as output,
+            ):
+                shutil.copyfileobj(response, output)
+            if digest(partial) != expected_sha256:
+                raise SystemExit(f"Official download checksum mismatch: {destination.name}")
+            partial.replace(destination)
+            return
+        except (OSError, urllib.error.URLError):
+            partial.unlink(missing_ok=True)
+            if attempt == 3:
+                raise
+            time.sleep(2 * attempt)
 
 
 def extract_source(archive: Path, destination: Path) -> Path:
@@ -50,12 +70,17 @@ def prepare_windows(target: Path) -> tuple[Path, str, str]:
     if unpack.exists():
         shutil.rmtree(unpack)
     unpack.mkdir()
-    subprocess.run(
-        [str(sdk), "-s", f"-d{unpack}"],
-        check=True,
-        timeout=60,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    )
+    try:
+        subprocess.run(
+            [str(sdk), "-s", f"-d{unpack}"],
+            check=True,
+            timeout=60,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except subprocess.TimeoutExpired:
+        # Some endpoint scanners keep the SFX process alive after all files are staged.
+        # The exact DLL and license checks below remain authoritative.
+        pass
     binary = unpack / "x64" / "UnRAR64.dll"
     if digest(binary) != WINDOWS_DLL_SHA256:
         raise SystemExit("UnRAR DLL checksum mismatch")
