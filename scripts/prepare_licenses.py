@@ -32,6 +32,16 @@ def bundled_license_path(relative: PurePosixPath) -> Path:
     return Path("_long") / f"{digest}{relative.suffix}"
 
 
+def python_license_path(base_prefix: str | Path) -> Path:
+    """Locate the CPython license across Windows and python.org/setup-python layouts."""
+    prefix = Path(base_prefix)
+    candidates = (prefix / "LICENSE.txt", prefix / "LICENSE")
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise RuntimeError("Python's bundled LICENSE/LICENCE.txt is missing")
+
+
 def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
     name, location = source
     if location.startswith("https://"):
@@ -136,9 +146,7 @@ def main() -> int:
             "https://raw.githubusercontent.com/jrsoftware/issrc/is-6_7_3/license.txt", timeout=30
         ) as response:
             inno_license.write_bytes(response.read())
-    python_license = Path(sys.base_prefix) / "LICENSE.txt"
-    if not python_license.is_file():
-        raise RuntimeError("Python's bundled LICENSE.txt is missing")
+    python_license = python_license_path(sys.base_prefix)
     shutil.copy2(python_license, destination / "Python-LICENSE.txt")
     dist = importlib.metadata.distribution("pyinstaller")
     for item in dist.files or []:

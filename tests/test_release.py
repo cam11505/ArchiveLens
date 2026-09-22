@@ -7,7 +7,11 @@ import pytest
 
 from archivelens import __version__
 from scripts.license_audit import load_policy, validate_runtime_package_names
-from scripts.prepare_licenses import MAX_LICENSE_PATH_LENGTH, bundled_license_path
+from scripts.prepare_licenses import (
+    MAX_LICENSE_PATH_LENGTH,
+    bundled_license_path,
+    python_license_path,
+)
 from scripts.verify_release import verify_archive
 from scripts.verify_release_set import verify_release_set
 
@@ -242,3 +246,15 @@ def test_long_upstream_license_paths_are_bounded_and_stably_indexable():
     assert bundled.parts[0] == "_long"
     assert len(bundled.as_posix()) <= MAX_LICENSE_PATH_LENGTH
     assert bundled == bundled_license_path(long)
+
+
+def test_python_license_path_accepts_cross_platform_layouts(tmp_path):
+    windows = tmp_path / "windows"
+    windows.mkdir()
+    (windows / "LICENSE.txt").write_text("license", encoding="utf-8")
+    assert python_license_path(windows) == windows / "LICENSE.txt"
+
+    unix = tmp_path / "unix"
+    unix.mkdir()
+    (unix / "LICENSE").write_text("license", encoding="utf-8")
+    assert python_license_path(unix) == unix / "LICENSE"
