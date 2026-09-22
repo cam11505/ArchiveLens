@@ -1,5 +1,6 @@
 import hashlib
 import json
+import sys
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
@@ -258,3 +259,9 @@ def test_python_license_path_accepts_cross_platform_layouts(tmp_path):
     unix.mkdir()
     (unix / "LICENSE").write_text("license", encoding="utf-8")
     assert python_license_path(unix) == unix / "LICENSE"
+
+    setup_python = tmp_path / "setup-python"
+    stdlib = setup_python / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
+    stdlib.mkdir(parents=True)
+    (stdlib / "LICENSE.txt").write_text("license", encoding="utf-8")
+    assert python_license_path(setup_python) == stdlib / "LICENSE.txt"

@@ -35,11 +35,26 @@ def bundled_license_path(relative: PurePosixPath) -> Path:
 def python_license_path(base_prefix: str | Path) -> Path:
     """Locate the CPython license across Windows and python.org/setup-python layouts."""
     prefix = Path(base_prefix)
-    candidates = (prefix / "LICENSE.txt", prefix / "LICENSE")
+    version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    names = ("LICENSE.txt", "LICENSE", "LICENCE.txt", "LICENCE")
+    directories = (
+        prefix,
+        prefix / "lib",
+        prefix / "lib" / version,
+        prefix / "Resources" / "English.lproj" / "Documentation",
+        prefix
+        / "Python.framework"
+        / "Versions"
+        / f"{sys.version_info.major}.{sys.version_info.minor}"
+        / "Resources"
+        / "English.lproj"
+        / "Documentation",
+    )
+    candidates = tuple(directory / name for directory in directories for name in names)
     for candidate in candidates:
         if candidate.is_file():
             return candidate
-    raise RuntimeError("Python's bundled LICENSE/LICENCE.txt is missing")
+    raise RuntimeError("Python's bundled LICENSE/LICENCE file is missing")
 
 
 def fetch_source(source: tuple[str, str], root: Path, version: str) -> dict:
