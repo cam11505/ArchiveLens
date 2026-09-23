@@ -8,6 +8,7 @@ dist/
 build/
 *.spec
 !scripts/ArchiveLens.spec
+!scripts/MacOSArchiveLens.spec
 .idea/
 .vscode/
 *.log

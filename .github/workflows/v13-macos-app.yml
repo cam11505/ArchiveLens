@@ -1,0 +1,64 @@
+name: v1.3 macOS arm64 application bundle
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/v13-macos-app.yml"
+      - "constraints-build.txt"
+      - "license-policy.json"
+      - "pyproject.toml"
+      - "scripts/MacOSArchiveLens.spec"
+      - "scripts/build_macos_app.py"
+      - "scripts/frozen_entry.py"
+      - "scripts/prepare_backends.py"
+      - "scripts/prepare_licenses.py"
+      - "scripts/verify_macos_app.py"
+      - "src/**"
+      - "tests/test_macos_app_bundle.py"
+      - "tests/fixtures/rar/**"
+      - "docs/MACOS_PACKAGING.md"
+
+permissions:
+  contents: read
+
+jobs:
+  macos-arm64-app:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -c constraints-build.txt -e ".[dev,build]"
+      - run: python -m ruff check src tests scripts
+      - run: python -m ruff format --check src tests scripts
+      - run: python -m pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Audit and stage approved runtime dependencies
+        run: |
+          python scripts/license_audit.py --check
+          python scripts/prepare_backends.py
+          python scripts/prepare_licenses.py
+      - name: Build self-contained development app
+        run: python scripts/build_macos_app.py --development
+      - name: Verify bundle, arm64 runtimes, and packaged self-test
+        run: >-
+          python scripts/verify_macos_app.py dist/ArchiveLens.app
+          --expected-commit ${{ github.sha }}
+          --allow-development
+          --run
+      - name: Preserve app bundle for issue evidence
+        run: >-
+          ditto -c -k --sequesterRsrc --keepParent
+          dist/ArchiveLens.app
+          outputs/macos-app-verification/ArchiveLens-macos-arm64-development.zip
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: ArchiveLens-macos-arm64-development
+          path: |
+            outputs/macos-app-verification/*
+            build/pyinstaller-macos/MacOSArchiveLens/warn-MacOSArchiveLens.txt
+          if-no-files-found: error

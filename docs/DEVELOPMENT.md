@@ -47,3 +47,10 @@ CI repeats source tests on Windows/Linux and full portable/installer checks on a
 Windows runner. Do not tag v1.2.2 until the exact-commit CI artifacts, local checksum
 verification and `V1.2.2_QA.md` release-candidate decisions are complete. Automated
 offscreen tests are not evidence of physical Explorer or multi-monitor behavior.
+
+## macOS arm64 development app
+
+v1.3 issue #46 adds a native, self-contained development `ArchiveLens.app`. Build and
+verification commands, metadata, included runtimes, and the explicit #47/#49 scope
+boundaries are documented in `MACOS_PACKAGING.md`. The bundle is unsigned/ad-hoc and
+must not be represented as an official macOS release.
