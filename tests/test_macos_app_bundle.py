@@ -2,6 +2,7 @@ import importlib.util
 import json
 import plistlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -111,3 +112,26 @@ def test_macos_spec_keeps_later_issue_scope_out():
     assert "argv_emulation=False" in spec
     assert "CFBundleDocumentTypes" not in spec
     assert "codesign_identity" not in spec
+
+
+def test_macos_packaged_self_test_uses_absolute_report_path(tmp_path, monkeypatch):
+    module = load_script("verify_macos_app.py")
+    app = tmp_path / "ArchiveLens.app"
+    executable = app / "Contents" / "MacOS" / "ArchiveLens"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"fixture")
+    monkeypatch.chdir(tmp_path)
+
+    def fake_run(command, **kwargs):
+        assert Path(command[2]).is_absolute()
+        assert kwargs["cwd"] == app.parent
+        Path(command[2]).write_text(
+            json.dumps({"success": True, "version": __version__}), encoding="utf-8"
+        )
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    report = module.run_self_test(app, Path("outputs/packaged-self-test.json"))
+
+    assert report == {"success": True, "version": __version__}
+    assert (tmp_path / "outputs" / "packaged-self-test.json").is_file()

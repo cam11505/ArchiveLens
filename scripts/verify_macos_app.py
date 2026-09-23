@@ -132,6 +132,10 @@ def verify_native_architecture(app: Path) -> dict[str, str]:
 
 
 def run_self_test(app: Path, report: Path) -> dict:
+    # The app is launched with ``dist`` as its working directory so the bundle is
+    # demonstrably independent from the checkout. Resolve the report first or a
+    # relative path would be written below ``dist`` and read back from the repo root.
+    report = report.resolve()
     report.parent.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     for key in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"):
