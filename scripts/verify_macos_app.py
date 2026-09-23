@@ -9,6 +9,7 @@ import plistlib
 import subprocess
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from archivelens import __version__
 
@@ -132,23 +133,32 @@ def verify_native_architecture(app: Path) -> dict[str, str]:
 
 
 def run_self_test(app: Path, report: Path) -> dict:
-    # The app is launched with ``dist`` as its working directory so the bundle is
-    # demonstrably independent from the checkout. Resolve the report first or a
-    # relative path would be written below ``dist`` and read back from the repo root.
+    # Resolve the report before changing the launch directory. A relative path would
+    # otherwise be written below the isolated staging directory and read from the repo.
     report = report.resolve()
     report.parent.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     for key in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"):
         env.pop(key, None)
-    env["QT_QPA_PLATFORM"] = "offscreen"
-    executable = app / "Contents" / "MacOS" / "ArchiveLens"
-    subprocess.run(
-        [str(executable), "--self-test-report", str(report)],
-        cwd=app.parent,
-        env=env,
-        check=True,
-        timeout=180,
-    )
+    with TemporaryDirectory(prefix="ArchiveLens-Finder-launch-") as directory:
+        launch_root = Path(directory)
+        staged_app = launch_root / app.name
+        subprocess.run(["/usr/bin/ditto", str(app), str(staged_app)], check=True)
+        subprocess.run(
+            [
+                "/usr/bin/open",
+                "-W",
+                "-n",
+                str(staged_app),
+                "--args",
+                "--self-test-report",
+                str(report),
+            ],
+            cwd=launch_root,
+            env=env,
+            check=True,
+            timeout=180,
+        )
     payload = json.loads(report.read_text(encoding="utf-8"))
     if not payload.get("success") or payload.get("version") != __version__:
         raise ValueError("Packaged self-test failed")

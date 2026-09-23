@@ -70,6 +70,8 @@ Verification checks:
 - required metadata, notices, licenses, QtPdf, image plugins, and RAR runtime;
 - exclusion of QtWebEngine;
 - arm64 architecture for every Mach-O file found in the bundle;
+- copying the app to an isolated directory outside the checkout and launching it
+  through macOS LaunchServices (`open -W -n`);
 - packaged GUI/backend self-test with Python/venv variables removed.
 
 The workflow archives the verified `.app` with `ditto` only as CI evidence. It is

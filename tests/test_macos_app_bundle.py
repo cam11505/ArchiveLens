@@ -122,12 +122,18 @@ def test_macos_packaged_self_test_uses_absolute_report_path(tmp_path, monkeypatc
     executable.write_bytes(b"fixture")
     monkeypatch.chdir(tmp_path)
 
+    commands = []
+
     def fake_run(command, **kwargs):
-        assert Path(command[2]).is_absolute()
-        assert kwargs["cwd"] == app.parent
-        Path(command[2]).write_text(
-            json.dumps({"success": True, "version": __version__}), encoding="utf-8"
-        )
+        commands.append((command, kwargs))
+        if command[0] == "/usr/bin/open":
+            report_path = Path(command[command.index("--self-test-report") + 1])
+            assert report_path.is_absolute()
+            assert kwargs["cwd"] != app.parent
+            assert not str(kwargs["cwd"]).startswith(str(Path(__file__).parents[1]))
+            report_path.write_text(
+                json.dumps({"success": True, "version": __version__}), encoding="utf-8"
+            )
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
@@ -135,3 +141,5 @@ def test_macos_packaged_self_test_uses_absolute_report_path(tmp_path, monkeypatc
 
     assert report == {"success": True, "version": __version__}
     assert (tmp_path / "outputs" / "packaged-self-test.json").is_file()
+    assert commands[0][0][0] == "/usr/bin/ditto"
+    assert commands[1][0][:3] == ["/usr/bin/open", "-W", "-n"]
