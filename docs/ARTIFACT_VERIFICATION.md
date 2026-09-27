@@ -20,6 +20,8 @@ Windows retains portable ZIP inventory, backend provenance, executable self-test
 installer verification and full release-set source archive/hash checks. macOS
 retains bundle layout/Finder declarations, actual backend provenance, Mach-O arm64,
 packaged self-test, Finder launch and independent DMG mount/install checks.
+macOS retains the prepared backend hash and records the packaged hash after
+PyInstaller relocation/ad-hoc signing, then re-seals the outer bundle ad-hoc.
 For a signed candidate the backend signed hash is also verified separately.
 Development macOS source **metadata** validation is not proof of delivery of a
 complete official corresponding-source release set.

@@ -124,6 +124,21 @@ def test_macos_backend_provenance_tampering(tmp_path):
         module.inspect_structure(app, "a" * 40, allow_development=True)
 
 
+def test_packaged_backend_records_relocation_hash_without_losing_provenance(tmp_path):
+    app = fake_app(tmp_path)
+    binary = app / "Contents/Frameworks/native/libunrar.dylib"
+    binary.write_bytes(b"relocated and ad-hoc signed")
+    builder = load_script("build_macos_app.py")
+    builder.record_packaged_backend(app)
+    info = json.loads((app / "Contents/Resources/build-info.json").read_text(encoding="utf-8"))
+    assert info["native_backends"]["rar"]["sha256"] == hashlib.sha256(b"fixture").hexdigest()
+    assert (
+        info["native_backends"]["rar"]["packaged_sha256"]
+        == hashlib.sha256(binary.read_bytes()).hexdigest()
+    )
+    load_script("verify_macos_app.py").inspect_structure(app, "a" * 40, allow_development=True)
+
+
 def test_macos_bundle_rejects_release_claim_and_finder_scope(tmp_path):
     module = load_script("verify_macos_app.py")
     app = fake_app(tmp_path)

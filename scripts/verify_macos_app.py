@@ -131,7 +131,13 @@ def inspect_structure(app: Path, expected_commit: str, *, allow_development: boo
         backend_hash = hashlib.file_digest(stream, "sha256").hexdigest()
     # Before official signing the raw build hash applies; afterwards the separate
     # signature verifier also requires the signed hash and Developer ID evidence.
-    fingerprint = "signed_sha256" if "signed_sha256" in backend else "sha256"
+    fingerprint = (
+        "signed_sha256"
+        if "signed_sha256" in backend
+        else "packaged_sha256"
+        if "packaged_sha256" in backend
+        else "sha256"
+    )
     if backend.get("name") != "libunrar.dylib" or backend.get(fingerprint) != backend_hash:
         raise ValueError("Native backend provenance does not match the app binary")
     sbom = json.loads(required["SBOM"].read_text(encoding="utf-8"))
