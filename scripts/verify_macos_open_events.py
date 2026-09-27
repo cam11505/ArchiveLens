@@ -53,10 +53,14 @@ def verify(app: Path, output: Path) -> None:
             wait_report(report, 1)
             subprocess.run(["/usr/bin/open", "-a", str(copied), str(warm)], check=True)
             data = wait_report(report, 2)
-            assert [e["path"] for e in data["events"]] == [str(cold), str(warm)]
-            assert all(e["pages"] == 1 for e in data["events"])
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            received = [Path(e["path"]).resolve() for e in data["events"]]
+            expected = [cold.resolve(), warm.resolve()]
+            if received != expected:
+                raise RuntimeError(f"Finder opened unexpected sources: {received}; expected {expected}")
+            if not all(e["pages"] == 1 for e in data["events"]):
+                raise RuntimeError("Finder sources did not load their expected page counts")
         finally:
             report.with_suffix(".stop").touch()
             time.sleep(0.5)
