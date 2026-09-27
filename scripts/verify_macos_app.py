@@ -12,6 +12,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from archivelens import __version__
+from archivelens.macos_documents import verify_document_types
 
 REQUIRED_BUILD_INFO = {
     "schema_version",
@@ -62,8 +63,7 @@ def inspect_structure(app: Path, expected_commit: str, *, allow_development: boo
     for key, value in expected_plist.items():
         if plist.get(key) != value:
             raise ValueError(f"Unexpected Info.plist {key}")
-    if "CFBundleDocumentTypes" in plist or "UTExportedTypeDeclarations" in plist:
-        raise ValueError("Finder document declarations belong to issue #47")
+    verify_document_types(plist)
 
     resources = app / "Contents" / "Resources"
     frameworks = app / "Contents" / "Frameworks"

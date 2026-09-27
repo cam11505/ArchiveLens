@@ -1,9 +1,18 @@
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QMimeData, Qt, QTimer, Slot
-from PySide6.QtGui import QActionGroup, QCloseEvent, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QCloseEvent,
+    QDragEnterEvent,
+    QDropEvent,
+    QKeySequence,
+)
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QDockWidget,
@@ -143,7 +152,9 @@ class MainWindow(QMainWindow):
         for target in self._drop_targets:
             target.setAcceptDrops(True)
             target.installEventFilter(self)
-        self.open_action = make_action(self, "開啟檔案…", self.choose_file, ["Ctrl+O"])
+        self.open_action = make_action(
+            self, "開啟檔案…", self.choose_file, [], standard_key=QKeySequence.StandardKey.Open
+        )
         self.open_folder_action = make_action(
             self, "開啟圖片資料夾…", self.choose_folder, ["Ctrl+Shift+O"]
         )
@@ -171,7 +182,13 @@ class MainWindow(QMainWindow):
         self.rotate_right_action = make_action(
             self, "向右旋轉", lambda: self.rotate_current(90), ["R"]
         )
-        self.fullscreen_action = make_action(self, "全螢幕", self.toggle_fullscreen, ["F", "F11"])
+        self.fullscreen_action = make_action(
+            self,
+            "全螢幕",
+            self.toggle_fullscreen,
+            ["F", "F11"],
+            standard_key=QKeySequence.StandardKey.FullScreen,
+        )
         self.fullscreen_action.setCheckable(True)
         make_action(self, "離開全螢幕", self.exit_fullscreen, ["Esc"])
         self._viewer_actions = [
@@ -202,7 +219,25 @@ class MainWindow(QMainWindow):
         self.recent_menu = menu.addMenu("最近閱讀")
         self.recent_menu.aboutToShow.connect(self._rebuild_recent_menu)
         menu.addSeparator()
-        menu.addAction(make_action(self, "結束", self.close, ["Ctrl+Q"]))
+        self.quit_action = make_action(
+            self,
+            "結束",
+            self.close,
+            ["Ctrl+Q"],
+            standard_key=QKeySequence.StandardKey.Quit,
+            menu_role=QAction.MenuRole.QuitRole,
+        )
+        menu.addAction(self.quit_action)
+        if sys.platform == "darwin":
+            self.preferences_action = make_action(
+                self,
+                "偏好設定…",
+                self.show_preferences,
+                [],
+                standard_key=QKeySequence.StandardKey.Preferences,
+                menu_role=QAction.MenuRole.PreferencesRole,
+            )
+            menu.addAction(self.preferences_action)
         view_menu = self.menuBar().addMenu("檢視")
         self.single_action = make_action(self, "單頁", lambda: self.set_reading(double=False), [])
         self.double_action = make_action(self, "雙頁", lambda: self.set_reading(double=True), [])
@@ -283,7 +318,10 @@ class MainWindow(QMainWindow):
         )
         help_menu = self.menuBar().addMenu("說明")
         help_menu.addAction(make_action(self, "操作說明", self.show_help, ["F1"]))
-        help_menu.addAction(make_action(self, "關於 ArchiveLens", self.show_about, []))
+        self.about_action = make_action(
+            self, "關於 ArchiveLens", self.show_about, [], menu_role=QAction.MenuRole.AboutRole
+        )
+        help_menu.addAction(self.about_action)
         self.counter = QLabel("0 / 0")
         self.statusBar().addPermanentWidget(self.counter)
         self.viewer.zoom_changed.connect(self._show_zoom)
@@ -809,12 +847,41 @@ class MainWindow(QMainWindow):
         self.fullscreen_action.setChecked(False)
 
     @Slot()
+    def show_preferences(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("偏好設定")
+        layout = QVBoxLayout(dialog)
+        cover = QCheckBox("第一頁為封面", dialog)
+        cover.setChecked(self.cover)
+        recursive = QCheckBox("圖片資料夾包含子資料夾", dialog)
+        recursive.setChecked(self.recursive_folders)
+        layout.addWidget(cover)
+        layout.addWidget(recursive)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, dialog
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if cover.isChecked() != self.cover:
+                self.toggle_cover()
+            if recursive.isChecked() != self.recursive_folders:
+                self.toggle_recursive_folders()
+
+    @Slot()
     def show_help(self) -> None:
+        open_key = self.open_action.shortcut().toString(QKeySequence.SequenceFormat.NativeText)
+        folder_key = self.open_folder_action.shortcut().toString(
+            QKeySequence.SequenceFormat.NativeText
+        )
         QMessageBox.information(
             self,
             "操作說明",
-            f"開啟內容：Ctrl+O 選擇 {self.content_registry.format_label()}；"
-            "Ctrl+Shift+O 選擇圖片資料夾\n"
+            f"開啟內容：{open_key} "
+            f"選擇 {self.content_registry.format_label()}；"
+            f"{folder_key} "
+            "選擇圖片資料夾\n"
             "也可將單一支援檔案或圖片資料夾拖曳到閱讀區域\n"
             "← / →：依閱讀方向翻頁；PageUp / PageDown：上一頁 / 下一頁\n"
             "Backspace / Space：上一張 / 下一張\nHome / End：第一張 / 最後一張\n"
