@@ -58,7 +58,9 @@ def verify(app: Path, output: Path) -> None:
             received = [Path(e["path"]).resolve() for e in data["events"]]
             expected = [cold.resolve(), warm.resolve()]
             if received != expected:
-                raise RuntimeError(f"Finder opened unexpected sources: {received}; expected {expected}")
+                raise RuntimeError(
+                    f"Finder opened unexpected sources: {received}; expected {expected}"
+                )
             if not all(e["pages"] == 1 for e in data["events"]):
                 raise RuntimeError("Finder sources did not load their expected page counts")
         finally:
