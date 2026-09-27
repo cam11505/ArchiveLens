@@ -57,6 +57,15 @@ def fake_app(tmp_path, *, development=True, invalid_document_types=False):
         },
     }
     (resources / "build-info.json").write_text(json.dumps(info), encoding="utf-8")
+    (resources / f"ArchiveLens-{__version__}.spdx.json").write_text(
+        json.dumps(
+            {
+                "spdxVersion": "SPDX-2.3",
+                "documentNamespace": f"https://example.test/{__version__}/{'a' * 40}",
+            }
+        ),
+        encoding="utf-8",
+    )
     for name in (
         "compiled-source.json",
         "README.md",

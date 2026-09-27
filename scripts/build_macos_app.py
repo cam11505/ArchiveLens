@@ -18,6 +18,11 @@ from PySide6.QtCore import qVersion
 
 from archivelens import __version__
 
+try:
+    from scripts.license_audit import write_spdx_sbom
+except ModuleNotFoundError:
+    from license_audit import write_spdx_sbom
+
 BASELINE_TAG = "v1.2.2"
 BASELINE_COMMIT = "bb0197b0291707287517ba8bdfc3a10ce1ad1149"
 DEPENDENCIES = (
@@ -49,7 +54,9 @@ def git_revision(root: Path) -> tuple[str, bool]:
     return revision, bool(status.strip())
 
 
-def build_info(root: Path, *, source_commit: str, dirty: bool) -> dict[str, object]:
+def build_info(
+    root: Path, *, source_commit: str, dirty: bool, official: bool = False
+) -> dict[str, object]:
     backend = json.loads(
         (root / "outputs" / "backends" / "UNRAR-BACKEND.json").read_text(encoding="utf-8")
     )
@@ -57,8 +64,8 @@ def build_info(root: Path, *, source_commit: str, dirty: bool) -> dict[str, obje
         "schema_version": 1,
         "version": __version__,
         "source_commit": source_commit,
-        "channel": "development",
-        "development": True,
+        "channel": "release" if official else "development",
+        "development": not official,
         "dirty": dirty,
         "os": "macos",
         "architecture": "arm64",
@@ -87,6 +94,8 @@ def compiled_source_fingerprints(root: Path) -> dict[str, str]:
             root / "scripts" / "build_macos_app.py",
             root / "scripts" / "frozen_entry.py",
             root / "scripts" / "verify_macos_app.py",
+            root / "scripts" / "macos_release.py",
+            root / "scripts" / "macos-entitlements.plist",
         ]
     )
     return {path.relative_to(root).as_posix(): sha256(path) for path in paths}
@@ -135,24 +144,32 @@ def validate_inputs(root: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
         "--development",
         action="store_true",
-        help="Required for #46 unsigned/ad-hoc builds; official release mode belongs to #49",
+        help="Unsigned/ad-hoc non-release developer build",
     )
+    mode.add_argument("--official", action="store_true", help="Use only via macos_release.py")
     args = parser.parse_args()
     if sys.platform != "darwin" or platform.machine() != "arm64":
         raise SystemExit("ArchiveLens.app must be built natively on macOS arm64")
-    if not args.development:
-        raise SystemExit("#46 creates development apps only; pass --development")
+    if args.official and os.environ.get("ARCHIVELENS_OFFICIAL_BUILD") != "1":
+        raise SystemExit("Official builds require the credential-checked macos_release.py path")
 
     root = Path(__file__).resolve().parents[1]
     validate_inputs(root)
     commit, dirty = git_revision(root)
+    if args.official and dirty:
+        raise SystemExit("Official builds require a clean checkout")
     metadata = root / "build" / "macos-app-metadata"
     metadata.mkdir(parents=True, exist_ok=True)
     (metadata / "build-info.json").write_text(
-        json.dumps(build_info(root, source_commit=commit, dirty=dirty), indent=2, sort_keys=True)
+        json.dumps(
+            build_info(root, source_commit=commit, dirty=dirty, official=args.official),
+            indent=2,
+            sort_keys=True,
+        )
         + "\n",
         encoding="utf-8",
     )
@@ -161,6 +178,7 @@ def main() -> int:
         encoding="utf-8",
     )
     icon = create_icns(metadata / "ArchiveLens.icns")
+    write_spdx_sbom(root, metadata / f"ArchiveLens-{__version__}.spdx.json", commit)
     env = os.environ.copy()
     env["ARCHIVELENS_MACOS_METADATA_DIR"] = str(metadata)
     env["ARCHIVELENS_MACOS_ICON"] = str(icon)
@@ -186,7 +204,7 @@ def main() -> int:
     app = root / "dist" / "ArchiveLens.app"
     if not app.is_dir():
         raise SystemExit("PyInstaller did not create dist/ArchiveLens.app")
-    print(f"macOS development application: {app}")
+    print(f"macOS {'official candidate' if args.official else 'development'} application: {app}")
     return 0
 
 
