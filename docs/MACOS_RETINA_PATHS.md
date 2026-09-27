@@ -33,19 +33,22 @@ handles source identification before resetting the reader. Cyclic links and
 unsupported missing folder requests show the existing error UI rather than
 escaping the UI callback or partially resetting the reader.
 
-## Physical QA still required
+## Deferred physical QA
 
-Status: **pending**, not passed or deferred. A hosted runner and synthetic events
-cannot supply physical display/trackpad evidence. Issue #48 must remain open until
-these results are supplied or the user explicitly changes the gate.
+Status: **deferred by user on 2026-09-27** because no physical Mac is currently
+available. The user requested continued development and future hardware validation.
+A hosted runner and synthetic events cannot supply physical display/trackpad
+evidence; these checks have not passed. This explicit scope decision removes the
+physical-QA blocker for #48/#49 after PR #69 is merged. Official signing,
+notarization, staple and exact-commit automated release gates remain mandatory.
 
 | Check | Required evidence | Status |
 | --- | --- | --- |
-| Built-in Retina → external display → Retina | Mac model, macOS, resolutions/scales; raster pixel clarity, fit/Actual Size/custom zoom, current page/rotation preserved | pending |
-| PDF single/double page and thumbnails on both displays | sharpness, opaque background, no stale-size frames, bounded work | pending |
-| Existing trackpad pan/scroll/modified zoom | natural scrolling, phase/momentum behavior, one action per input, no duplicate page navigation | pending |
-| Fullscreen enter/exit on both displays | page/fit/zoom/rotation/reading state retained | pending |
-| Physical removable volume unplug/replug | safe failure and expected history/resume on reconnect | pending |
+| Built-in Retina → external display → Retina | Mac model, macOS, resolutions/scales; raster pixel clarity, fit/Actual Size/custom zoom, current page/rotation preserved | deferred |
+| PDF single/double page and thumbnails on both displays | sharpness, opaque background, no stale-size frames, bounded work | deferred |
+| Existing trackpad pan/scroll/modified zoom | natural scrolling, phase/momentum behavior, one action per input, no duplicate page navigation | deferred |
+| Fullscreen enter/exit on both displays | page/fit/zoom/rotation/reading state retained | deferred |
+| Physical removable volume unplug/replug | safe failure and expected history/resume on reconnect | deferred |
 
 Record artifact commit, hardware/display/volume details, steps, observed results,
 and screenshots when applicable. APFS images cover filesystem detach semantics;
