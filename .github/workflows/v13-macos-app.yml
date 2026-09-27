@@ -15,10 +15,13 @@ on:
       - "scripts/prepare_licenses.py"
       - "scripts/verify_macos_app.py"
       - "scripts/verify_macos_open_events.py"
+      - "scripts/qualify_macos_volumes.py"
       - "src/**"
       - "tests/test_macos_app_bundle.py"
+      - "tests/test_v13_retina_paths.py"
       - "tests/fixtures/rar/**"
       - "docs/MACOS_PACKAGING.md"
+      - "docs/MACOS_RETINA_PATHS.md"
 
 permissions:
   contents: read

@@ -20,7 +20,7 @@ def qualify(output: Path) -> None:
     report = []
     with TemporaryDirectory(prefix="archivelens-apfs-") as temporary:
         root = Path(temporary)
-        for filesystem, sensitive in (("APFS", False), ("APFSX", True)):
+        for filesystem, sensitive in (("APFS", False), ("Case-sensitive APFS", True)):
             image = root / f"{filesystem}.dmg"
             mount = root / f"mount-{filesystem}"
             subprocess.run(
