@@ -16,6 +16,7 @@ a = Analysis(
         (str(root / "tests" / "fixtures" / "rar"), "self-test-rar"),
         (str(metadata_dir / "build-info.json"), "."),
         (str(metadata_dir / "compiled-source.json"), "."),
+        (str(metadata_dir / f"ArchiveLens-{version}.spdx.json"), "."),
         (str(root / "README.md"), "."),
         (str(root / "README.zh-TW.md"), "."),
         (str(root / "LICENSE"), "."),

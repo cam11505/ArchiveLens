@@ -35,7 +35,7 @@ python scripts/build_macos_app.py --development
 - RAR self-test fixtures;
 - README/license/notices and audited third-party licenses;
 - a generated application icon;
-- `build-info.json` and `compiled-source.json`.
+- `build-info.json`, `compiled-source.json`, and exact-source SPDX SBOM.
 
 The bundle identifier is `com.cam11505.archivelens`. `argv_emulation` is disabled;
 Issue #47 adds alternate-viewer Finder declarations for CBZ, CBR, ZIP, RAR, 7Z,
@@ -78,6 +78,9 @@ Verification checks:
 
 The workflow archives the verified `.app` with `ditto` only as CI evidence. It is
 not the official v1.3 DMG and must not be published as a signed/notarized release.
+
+Issue #49 adds the separated official candidate and development DMG probe described
+in [MACOS_SIGNING.md](MACOS_SIGNING.md). The development path remains credential-free.
 
 ## Issue #47 native integration
 

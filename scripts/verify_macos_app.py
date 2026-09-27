@@ -76,19 +76,25 @@ def inspect_structure(app: Path, expected_commit: str, *, allow_development: boo
         "schema_version": 1,
         "version": __version__,
         "source_commit": expected_commit,
-        "channel": "development",
+        "channel": "development" if allow_development else "release",
+        "development": allow_development,
         "os": "macos",
         "architecture": "arm64",
         "artifact_kind": "app",
         "parity_baseline": BASELINE,
     }
+    if info.get("development") and not allow_development:
+        raise ValueError("Development app requires --allow-development")
+    if info.get("development") is not allow_development:
+        raise ValueError("Invalid development channel marker")
     for key, value in expected.items():
         if info.get(key) != value:
             raise ValueError(f"Unexpected build-info.json {key}")
-    if info.get("development") and not allow_development:
-        raise ValueError("Development app requires --allow-development")
+    if not allow_development and info.get("dirty") is not False:
+        raise ValueError("Official app must have a clean source checkout")
 
     required = {
+        "SBOM": resources / f"ArchiveLens-{__version__}.spdx.json",
         "compiled-source.json": resources / "compiled-source.json",
         "README.md": resources / "README.md",
         "README.zh-TW.md": resources / "README.zh-TW.md",
@@ -101,6 +107,11 @@ def inspect_structure(app: Path, expected_commit: str, *, allow_development: boo
         "libunrar.dylib": frameworks / "native" / "libunrar.dylib",
     }
     located = {name: str(required_file(path).relative_to(app)) for name, path in required.items()}
+    sbom = json.loads(required["SBOM"].read_text(encoding="utf-8"))
+    if sbom.get("spdxVersion") != "SPDX-2.3" or not sbom.get("documentNamespace", "").endswith(
+        f"/{__version__}/{expected_commit}"
+    ):
+        raise ValueError("SBOM schema/source commit does not match the app")
     if any("qtwebengine" in path.name.casefold() for path in app.rglob("*")):
         raise ValueError("QtWebEngine must not be bundled")
     image_plugins = frameworks / "PySide6" / "Qt" / "plugins" / "imageformats"
@@ -175,6 +186,10 @@ def main() -> int:
     )
     parser.add_argument("--run", action="store_true")
     args = parser.parse_args()
+    if not args.allow_development:
+        raise SystemExit(
+            "Official verification requires macos_release.py verify (signing + staple)"
+        )
     if sys.platform != "darwin":
         raise SystemExit("macOS app verification must run on macOS")
     result = inspect_structure(
