@@ -1,6 +1,8 @@
 name: v1.3 macOS arm64 application bundle
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   pull_request:
     paths:
@@ -11,6 +13,7 @@ on:
       - "scripts/MacOSArchiveLens.spec"
       - "scripts/build_macos_app.py"
       - "scripts/macos_release.py"
+      - "scripts/artifact_contract.py"
       - "scripts/macos-entitlements.plist"
       - "scripts/frozen_entry.py"
       - "scripts/prepare_backends.py"
@@ -21,6 +24,7 @@ on:
       - "src/**"
       - "tests/test_macos_app_bundle.py"
       - "tests/test_macos_release.py"
+      - "tests/test_artifact_contract.py"
       - "tests/test_v13_retina_paths.py"
       - "tests/fixtures/rar/**"
       - "docs/MACOS_PACKAGING.md"

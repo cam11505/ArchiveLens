@@ -23,6 +23,11 @@ from tempfile import TemporaryDirectory
 
 from archivelens import __version__
 
+try:
+    from scripts.artifact_contract import verify_checksums
+except ModuleNotFoundError:
+    from artifact_contract import verify_checksums
+
 SECRET_NAMES = (
     "MACOS_CERTIFICATE_P12_BASE64",
     "MACOS_CERTIFICATE_PASSWORD",
@@ -466,6 +471,10 @@ def verify_development_inventory(dmg: Path, commit: str) -> dict:
         checksums = (dmg.parent / "SHA256SUMS.txt").read_text(encoding="utf-8")
     except (OSError, ValueError):
         raise ReleaseError("Missing or invalid development download inventory") from None
+    try:
+        verify_checksums(dmg.parent, expected_files={dmg.name})
+    except (OSError, ValueError):
+        raise ReleaseError("Development SHA-256/commit/channel inventory mismatch") from None
     expected = {
         "schema_version": 1,
         "channel": "development",

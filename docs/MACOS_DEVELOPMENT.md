@@ -75,7 +75,7 @@ and source immutability. Existing physical checklist:
 - Development app/DMG and source/Windows regression may continue without payment.
 - Developer ID, hardened-runtime official qualification, notarization/staple and
   official Gatekeeper verification remain deferred, not passed.
-- #50 development-only integration may begin after PR #70 merges; do not close
+- PR #70 is merged; #50 development-only integration is in progress. Do not close
   its official acceptance criteria with this development evidence.
 - #51 official RC, `v1.3.0` tag and official release remain blocked until the user
   resumes the official track and all mandatory gates pass.

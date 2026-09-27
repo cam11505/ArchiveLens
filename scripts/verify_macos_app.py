@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import plistlib
@@ -13,6 +14,15 @@ from tempfile import TemporaryDirectory
 
 from archivelens import __version__
 from archivelens.macos_documents import verify_document_types
+
+try:
+    from scripts.artifact_contract import (
+        verify_build_info,
+        verify_license_metadata,
+        verify_source_metadata,
+    )
+except ModuleNotFoundError:
+    from artifact_contract import verify_build_info, verify_license_metadata, verify_source_metadata
 
 REQUIRED_BUILD_INFO = {
     "schema_version",
@@ -69,6 +79,15 @@ def inspect_structure(app: Path, expected_commit: str, *, allow_development: boo
     frameworks = app / "Contents" / "Frameworks"
     info_path = required_file(resources / "build-info.json")
     info = json.loads(info_path.read_text(encoding="utf-8"))
+    verify_build_info(
+        info,
+        version=__version__,
+        commit=expected_commit,
+        os_name="macos",
+        architecture="arm64",
+        kind="app",
+        allow_development=allow_development,
+    )
     missing = REQUIRED_BUILD_INFO - info.keys()
     if missing:
         raise ValueError("build-info.json is missing: " + ", ".join(sorted(missing)))
@@ -107,7 +126,24 @@ def inspect_structure(app: Path, expected_commit: str, *, allow_development: boo
         "libunrar.dylib": frameworks / "native" / "libunrar.dylib",
     }
     located = {name: str(required_file(path).relative_to(app)) for name, path in required.items()}
+    backend = info["native_backends"].get("rar", {})
+    with required["libunrar.dylib"].open("rb") as stream:
+        backend_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+    # Before official signing the raw build hash applies; afterwards the separate
+    # signature verifier also requires the signed hash and Developer ID evidence.
+    fingerprint = "signed_sha256" if "signed_sha256" in backend else "sha256"
+    if backend.get("name") != "libunrar.dylib" or backend.get(fingerprint) != backend_hash:
+        raise ValueError("Native backend provenance does not match the app binary")
     sbom = json.loads(required["SBOM"].read_text(encoding="utf-8"))
+    verify_license_metadata(
+        json.loads(required["license-policy.json"].read_text(encoding="utf-8")),
+        sbom,
+        version=__version__,
+        commit=expected_commit,
+    )
+    verify_source_metadata(
+        json.loads(required["upstream-sources.json"].read_text(encoding="utf-8"))
+    )
     if sbom.get("spdxVersion") != "SPDX-2.3" or not sbom.get("documentNamespace", "").endswith(
         f"/{__version__}/{expected_commit}"
     ):

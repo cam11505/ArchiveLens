@@ -12,6 +12,15 @@ from zipfile import ZipFile
 
 from archivelens import __version__
 
+if __package__:
+    from scripts.artifact_contract import (
+        verify_build_info,
+        verify_file_record,
+        verify_license_metadata,
+    )
+else:
+    from artifact_contract import verify_build_info, verify_file_record, verify_license_metadata
+
 
 def verify_archive(
     path: Path, expected_commit: str | None = None, allow_development: bool = False
@@ -37,6 +46,7 @@ def verify_archive(
         if set(names) != expected:
             raise ValueError("Portable file inventory does not match its manifest")
         for name, record in manifest.items():
+            verify_file_record(name, record)
             info = archive.getinfo("ArchiveLens/" + name)
             if info.file_size != record["size"]:
                 raise ValueError(f"Size mismatch: {name}")
@@ -77,6 +87,21 @@ def verify_archive(
         ):
             raise ValueError("Unused Qt modules must not be distributed")
         build = json.loads(archive.read("ArchiveLens/build-info.json"))
+        verify_build_info(
+            build,
+            version=__version__,
+            commit=expected_commit,
+            os_name="windows",
+            architecture="x64",
+            kind="portable",
+            allow_development=allow_development,
+        )
+        backend = build["native_backends"].get("rar", {})
+        if (
+            backend.get("name") != "UnRAR64.dll"
+            or backend.get("sha256") != manifest["_internal/native/UnRAR64.dll"]["sha256"]
+        ):
+            raise ValueError("Native backend provenance does not match the portable binary")
         if build["version"] != __version__:
             raise ValueError("Unexpected release version")
         if build["development"] and not allow_development:
@@ -97,6 +122,7 @@ def verify_archive(
         if not unrar or unrar.get("classification") != "redistributable-non-foss":
             raise ValueError("Bundled UnRAR licensing classification is missing")
         sbom = json.loads(archive.read("ArchiveLens/" + sbom_name))
+        verify_license_metadata(policy, sbom, version=__version__, commit=build["source_commit"])
         if sbom.get("spdxVersion") != "SPDX-2.3" or sbom.get("dataLicense") != "CC0-1.0":
             raise ValueError("Invalid SPDX SBOM header")
         application = next(

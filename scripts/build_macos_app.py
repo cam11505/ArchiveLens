@@ -95,6 +95,7 @@ def compiled_source_fingerprints(root: Path) -> dict[str, str]:
             root / "scripts" / "frozen_entry.py",
             root / "scripts" / "verify_macos_app.py",
             root / "scripts" / "macos_release.py",
+            root / "scripts" / "artifact_contract.py",
             root / "scripts" / "macos-entitlements.plist",
         ]
     )

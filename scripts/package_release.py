@@ -10,6 +10,8 @@ import subprocess
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from PySide6.QtCore import qVersion
+
 from archivelens import __version__
 
 if __package__:
@@ -57,7 +59,33 @@ def main() -> int:
     for name, fingerprint in compiled.items():
         if sha256(root / name) != fingerprint:
             raise SystemExit(f"Source changed after the EXE build: {name}; rebuild first.")
+    backend = json.loads((root / "outputs/backends/UNRAR-BACKEND.json").read_text(encoding="utf-8"))
+    backend_path = bundle / "_internal/native/UnRAR64.dll"
+    if (
+        backend.get("platform") != "win32"
+        or backend.get("architecture") != "AMD64"
+        or backend.get("binary") != backend_path.name
+        or backend.get("binary_sha256") != sha256(backend_path)
+    ):
+        raise SystemExit("Packaged native backend differs from its prepared provenance.")
     info = {
+        "schema_version": 1,
+        "channel": "development" if args.development else "release",
+        "os": "windows",
+        "architecture": "x64",
+        "artifact_kind": "portable",
+        "python_version": platform.python_version(),
+        "pyside_version": importlib.metadata.version("PySide6"),
+        "qt_version": qVersion(),
+        "parity_baseline": {"tag": "v1.2.2", "commit": "bb0197b0291707287517ba8bdfc3a10ce1ad1149"},
+        "native_backends": {
+            "rar": {
+                "name": backend["binary"],
+                "version": backend["version"],
+                "architecture": "x64",
+                "sha256": sha256(bundle / "_internal/native/UnRAR64.dll"),
+            }
+        },
         "version": __version__,
         "source_commit": commit,
         "development": args.development,
