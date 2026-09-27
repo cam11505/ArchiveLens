@@ -39,7 +39,7 @@ from archivelens.content.base import (
     source_identity_for_path,
 )
 from archivelens.content.factory import create_content_registry
-from archivelens.errors import BadPasswordError, PasswordRequiredError
+from archivelens.errors import ArchiveLensError, BadPasswordError, PasswordRequiredError
 from archivelens.image.reading import spread_indices
 from archivelens.image.trim import TrimMargins
 from archivelens.image.worker import ImageWorker, LoadRequest, LoadResult
@@ -368,10 +368,16 @@ class MainWindow(QMainWindow):
     def open_content(self, path: str | Path) -> None:
         if self._closing:
             return
+        source_path = Path(path)
+        try:
+            source_type = self.content_registry.source_type(source_path)
+            source_identity = source_identity_for_path(source_path, source_type)
+        except ArchiveLensError as exc:
+            self._show_error(str(exc))
+            return
         self.thumbnails.reset_session()
-        self.source_path = Path(path)
-        source_type = self.content_registry.source_type(self.source_path)
-        self.source_identity = source_identity_for_path(self.source_path, source_type)
+        self.source_path = source_path
+        self.source_identity = source_identity
         saved = self.reading_store.get(self.source_identity)
         self._identity_resolved = False
         self.entries = ()
