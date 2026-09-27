@@ -3,27 +3,25 @@
 import argparse
 import hashlib
 import json
-from pathlib import Path, PurePath
+from pathlib import Path
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
 from archivelens import __version__
 
-CONTROLLED_SOURCE_REFERENCES = {
-    (
-        "https://github.com/cam11505/ArchiveLens/releases/download/v1.2.1/"
-        "qtwebengine-everywhere-src-6.11.2.tar.xz"
-    ): {
-        "component": "qtpdf",
-        "version": "6.11.2",
-        "source_archive": "qtwebengine-everywhere-src-6.11.2.tar.xz",
-        "sha256": "6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163",
-    }
-}
-
 if __package__:
+    from scripts.artifact_contract import (
+        CONTROLLED_SOURCE_REFERENCES,
+        verify_checksums,
+        verify_source_metadata,
+    )
     from scripts.verify_release import verify_archive
 else:
+    from artifact_contract import (
+        CONTROLLED_SOURCE_REFERENCES,
+        verify_checksums,
+        verify_source_metadata,
+    )
     from verify_release import verify_archive
 
 
@@ -58,28 +56,7 @@ def verify_distribution_source(record: dict, directory: Path) -> None:
 
 
 def verify_release_set(directory: Path, expected_commit: str | None = None) -> dict:
-    checksums = directory / "SHA256SUMS.txt"
-    if not checksums.is_file():
-        raise ValueError("SHA256SUMS.txt is missing")
-    records = {}
-    for line in checksums.read_text(encoding="utf-8").splitlines():
-        digest, separator, name = line.partition("  ")
-        if (
-            separator != "  "
-            or len(digest) != 64
-            or any(character not in "0123456789abcdef" for character in digest)
-            or not name
-            or PurePath(name).name != name
-            or name in records
-        ):
-            raise ValueError("Invalid release checksum record")
-        records[name] = digest
-    actual = {path.name for path in directory.iterdir() if path.is_file() and path != checksums}
-    if set(records) != actual:
-        raise ValueError("Release checksum inventory mismatch")
-    for name, digest in records.items():
-        if sha256(directory / name) != digest:
-            raise ValueError(f"Release SHA-256 mismatch: {name}")
+    records = verify_checksums(directory)
 
     prefix = f"ArchiveLens-{__version__}"
     portable = directory / f"{prefix}-windows-x64.zip"
@@ -127,9 +104,7 @@ def verify_release_set(directory: Path, expected_commit: str | None = None) -> d
         raise ValueError("Standalone third-party notices differ from portable metadata")
     if standalone_sbom.get("spdxVersion") != "SPDX-2.3":
         raise ValueError("Standalone SPDX SBOM has the wrong schema version")
-    components = {record["component"] for record in sources}
-    if not {"Pillow", "qtpdf", "qtbase", "qtimageformats", "pyside-setup"} <= components:
-        raise ValueError("Required v1.2 source/license components are missing")
+    verify_source_metadata(sources)
     for record in sources:
         verify_distribution_source(record, directory)
     return {"version": __version__, "source_commit": build["source_commit"], "files": len(records)}

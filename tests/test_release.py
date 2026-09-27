@@ -7,6 +7,7 @@ from zipfile import ZipFile
 import pytest
 
 from archivelens import __version__
+from scripts.artifact_contract import BASELINE
 from scripts.license_audit import load_policy, validate_runtime_package_names
 from scripts.prepare_licenses import (
     MAX_LICENSE_PATH_LENGTH,
@@ -15,6 +16,31 @@ from scripts.prepare_licenses import (
 )
 from scripts.verify_release import verify_archive
 from scripts.verify_release_set import verify_release_set
+
+
+def release_build_info(development=False):
+    return {
+        "schema_version": 1,
+        "version": __version__,
+        "source_commit": "a" * 40,
+        "development": development,
+        "channel": "development" if development else "release",
+        "os": "windows",
+        "architecture": "x64",
+        "artifact_kind": "portable",
+        "python_version": "3.12.0",
+        "pyside_version": "6.11.2",
+        "qt_version": "6.11.2",
+        "parity_baseline": BASELINE,
+        "native_backends": {
+            "rar": {
+                "name": "UnRAR64.dll",
+                "version": "7.23",
+                "architecture": "x64",
+                "sha256": hashlib.sha256(b"fixture").hexdigest(),
+            }
+        },
+    }
 
 
 def release_policy():
@@ -37,7 +63,7 @@ def release_sbom():
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
         "name": f"ArchiveLens-{__version__}-release-sbom",
-        "documentNamespace": f"https://example.invalid/ArchiveLens/{__version__}",
+        "documentNamespace": f"https://example.invalid/ArchiveLens/{__version__}/{'a' * 40}",
         "creationInfo": {"created": "2026-01-01T00:00:00Z", "creators": ["Tool: test"]},
         "packages": [
             {
@@ -49,7 +75,8 @@ def release_sbom():
                 "licenseConcluded": "MIT",
                 "licenseDeclared": "MIT",
                 "copyrightText": "NOASSERTION",
-            }
+            },
+            {"name": "UnRAR native library", "licenseDeclared": "NOASSERTION"},
         ],
     }
 
@@ -81,9 +108,7 @@ def create_portable(path, corrupt=False, development=False, sources=None):
     }
     files["licenses/license-policy.json"] = policy
     files[f"ArchiveLens-{__version__}.spdx.json"] = sbom
-    files["build-info.json"] = json.dumps(
-        {"version": __version__, "source_commit": "a" * 40, "development": development}
-    ).encode()
+    files["build-info.json"] = json.dumps(release_build_info(development)).encode()
     if sources is not None:
         files["licenses/upstream-sources.json"] = json.dumps(sources).encode()
     manifest = {
@@ -136,6 +161,8 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
     sources = [
         {
             "component": component,
+            "version": "fixture",
+            "source_url": "https://example.invalid/source.tar.gz",
             "source_archive": source_name,
             "sha256": source_digest,
         }
@@ -145,6 +172,7 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
         {
             "component": "qtpdf",
             "version": "6.11.2",
+            "source_url": "https://download.qt.io/source.tar.xz",
             "source_archive": "qtwebengine-everywhere-src-6.11.2.tar.xz",
             "sha256": "6101c1aa00ff933d1b65ee5d167f76e8d71b9ac5b378b0111277723ebda7c163",
             "distribution_url": (
@@ -155,7 +183,7 @@ def test_complete_release_set_checksum_and_source_verification(tmp_path):
     )
     portable = tmp_path / f"ArchiveLens-{__version__}-windows-x64.zip"
     create_portable(portable, sources=sources)
-    build_info = {"version": __version__, "source_commit": "a" * 40, "development": False}
+    build_info = release_build_info()
     (tmp_path / "build-info.json").write_text(json.dumps(build_info), encoding="utf-8")
     (tmp_path / f"ArchiveLens-{__version__}-setup-x64.exe").write_bytes(b"installer")
     (tmp_path / f"archivelens-{__version__}-py3-none-any.whl").write_bytes(b"wheel")

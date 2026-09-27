@@ -95,10 +95,21 @@ def compiled_source_fingerprints(root: Path) -> dict[str, str]:
             root / "scripts" / "frozen_entry.py",
             root / "scripts" / "verify_macos_app.py",
             root / "scripts" / "macos_release.py",
+            root / "scripts" / "artifact_contract.py",
             root / "scripts" / "macos-entitlements.plist",
         ]
     )
     return {path.relative_to(root).as_posix(): sha256(path) for path in paths}
+
+
+def record_packaged_backend(app: Path) -> None:
+    """Retain prepared provenance and bind the relocated/ad-hoc signed dylib."""
+    path = app / "Contents/Resources/build-info.json"
+    info = json.loads(path.read_text(encoding="utf-8"))
+    info["native_backends"]["rar"]["packaged_sha256"] = sha256(
+        app / "Contents/Frameworks/native/libunrar.dylib"
+    )
+    path.write_text(json.dumps(info, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def draw_icon(size: int) -> Image.Image:
@@ -204,6 +215,10 @@ def main() -> int:
     app = root / "dist" / "ArchiveLens.app"
     if not app.is_dir():
         raise SystemExit("PyInstaller did not create dist/ArchiveLens.app")
+    record_packaged_backend(app)
+    # The metadata update changes the outer resource seal, not nested code.
+    # Re-seal only the outer bundle ad-hoc; this is not Developer ID signing.
+    subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
     print(f"macOS {'official candidate' if args.official else 'development'} application: {app}")
     return 0
 
