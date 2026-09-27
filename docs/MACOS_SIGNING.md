@@ -9,10 +9,17 @@ Prerequisites #46–#48 are complete; PR #69 merged at
 
 The credential-free development path and official fail-closed implementation are
 separate. #49 is **not complete** until a real Developer ID candidate passes all
-signing/notarization/staple/Gatekeeper/loadability checks. As of 2026-09-27 the user
-is unsure whether paid Apple Developer membership and a Developer ID Application
-certificate exist. Repository-level GitHub secrets were empty; this does not
-establish the state of organization/environment secrets or the user's Apple account.
+signing/notarization/staple/Gatekeeper/loadability checks. On 2026-09-27 the user
+explicitly chose **not to pay/enroll or perform official signing/notarization for now**
+and authorized continued macOS development-build testing. The supplied account
+screenshots showed enrollment prompts and certificate access unavailable; the user
+has no `.p12` backup. This is not proof of account history or all other teams.
+
+Official #49 completion is **deferred**, not passed. Credential-free developer work
+may continue, including development-only #50 integration after this PR is merged.
+Do not request payment/credentials or dispatch the official job unless the user
+later explicitly resumes that track. Existing official fail-closed checks remain
+unchanged. #50 official integration and #51 official RC completion still need #49.
 
 No v1.3 tag or GitHub Release is created by this workflow. #50 common release-set
 integration and #51 final exact-commit RC remain later gates.
@@ -29,17 +36,22 @@ python scripts/macos_release.py development-dmg \
   --report outputs/macos-dmg-development/report.json
 ```
 
-The probe creates `ArchiveLens-development-not-for-release.dmg` under `outputs`,
+The probe creates `ArchiveLens-<version>-macos-arm64-development.dmg` under `outputs`,
 not the official artifact directory. It verifies the read-only image, fixed top-level
 contents (`ArchiveLens.app`, `/Applications` install symlink), exact app metadata,
 native arm64 binaries, and a ditto-copy/LaunchServices packaged self-test outside the
-checkout. The image is detached on success or validation failure. Only JSON evidence
-is uploaded, not this unsigned/ad-hoc DMG.
+checkout. The image is detached on success or validation failure. After a second
+independent verification of download inventory and the mounted app, CI uploads
+the clearly named development DMG with SHA-256, manifest and JSON evidence.
+It is not an official GitHub Release. See [MACOS_DEVELOPMENT.md](MACOS_DEVELOPMENT.md).
 
 DMG contents are deterministic in layout. Byte-for-byte reproducibility of HFS+
 images, notarization tickets, signatures and timestamps is **not** claimed.
 
 ## External setup (owner action, never paste secrets in chat)
+
+**Deferred instructions: do not perform until the user explicitly resumes the
+paid/official track. No account payment or secret configuration is requested now.**
 
 Confirm active Apple Developer membership, then obtain a Developer ID Application
 certificate with its private key. Export a password-protected PKCS#12 file. Prepare

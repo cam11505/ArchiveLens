@@ -25,6 +25,7 @@ on:
       - "tests/fixtures/rar/**"
       - "docs/MACOS_PACKAGING.md"
       - "docs/MACOS_SIGNING.md"
+      - "docs/MACOS_DEVELOPMENT.md"
       - "docs/MACOS_RETINA_PATHS.md"
 
 permissions:
@@ -71,6 +72,19 @@ jobs:
           python scripts/macos_release.py development-dmg
           --expected-commit ${{ github.sha }}
           --report outputs/macos-dmg-development/report.json
+      - name: Independently verify the development download inventory and mounted app
+        run: |
+          dmg_files=(outputs/macos-dmg-development/*-development.dmg)
+          test "${#dmg_files[@]}" -eq 1
+          python scripts/macos_release.py verify-development \
+            --dmg "${dmg_files[0]}" --expected-commit ${{ github.sha }} \
+            --report outputs/macos-dmg-development/independent-report.json
+      - name: Upload verified development DMG (not an official release)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ArchiveLens-macos-arm64-development-dmg
+          path: outputs/macos-dmg-development/*
+          if-no-files-found: error
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:

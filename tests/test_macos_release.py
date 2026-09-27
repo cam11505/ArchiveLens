@@ -7,6 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from archivelens import __version__
+
 
 def module():
     path = Path(__file__).parents[1] / "scripts/macos_release.py"
@@ -302,3 +304,80 @@ def test_workflow_official_is_separated_and_success_only():
     assert "contents: read" in workflow
     assert "gh release" not in workflow
     assert plistlib.loads((root / "scripts/macos-entitlements.plist").read_bytes()) == {}
+
+
+def development_fixture(loaded, tmp_path):
+    dmg = tmp_path / f"ArchiveLens-{__version__}-macos-arm64-development.dmg"
+    dmg.write_bytes(b"development-dmg-fixture")
+    inventory = loaded.development_inventory(
+        dmg,
+        "a" * 40,
+        {
+            "success": True,
+            "development": True,
+            "channel": "development",
+            "source_commit": "a" * 40,
+            "version": __version__,
+            "os": "macos",
+            "architecture": "arm64",
+            "artifact_kind": "dmg",
+            "native_count": 223,
+        },
+    )
+    return dmg, inventory
+
+
+def test_development_inventory_download_integrity(tmp_path):
+    loaded = module()
+    dmg, inventory = development_fixture(loaded, tmp_path)
+    assert loaded.verify_development_inventory(dmg, "a" * 40) == inventory
+    assert inventory["release_eligible"] is False
+    assert inventory["notarization"] == "not-performed"
+    dmg.write_bytes(b"tampered")
+    with pytest.raises(loaded.ReleaseError, match="SHA-256"):
+        loaded.verify_development_inventory(dmg, "a" * 40)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("source_commit", "b" * 40),
+        ("channel", "release"),
+        ("development", False),
+        ("release_eligible", True),
+        ("architecture", "x64"),
+        ("notarization", "Accepted"),
+    ],
+)
+def test_development_inventory_rejects_wrong_commit_or_release_claim(tmp_path, field, value):
+    loaded = module()
+    dmg, inventory = development_fixture(loaded, tmp_path)
+    inventory[field] = value
+    (tmp_path / "development-manifest.json").write_text(json.dumps(inventory))
+    with pytest.raises(loaded.ReleaseError, match="inventory mismatch"):
+        loaded.verify_development_inventory(dmg, "a" * 40)
+
+
+def test_development_inventory_requires_checksum_and_development_name(tmp_path):
+    loaded = module()
+    dmg, _ = development_fixture(loaded, tmp_path)
+    (tmp_path / "SHA256SUMS.txt").unlink()
+    with pytest.raises(loaded.ReleaseError, match="inventory"):
+        loaded.verify_development_inventory(dmg, "a" * 40)
+    renamed = tmp_path / f"ArchiveLens-{__version__}-macos-arm64.dmg"
+    dmg.rename(renamed)
+    with pytest.raises(loaded.ReleaseError, match="development DMG"):
+        loaded.verify_development_inventory(renamed, "a" * 40)
+
+
+def test_development_inventory_cannot_wrap_official_result(tmp_path):
+    loaded = module()
+    with pytest.raises(loaded.ReleaseError, match="verified development app"):
+        loaded.development_inventory(
+            tmp_path / "nonexistent.dmg",
+            "a" * 40,
+            {
+                "development": False,
+                "source_commit": "a" * 40,
+            },
+        )

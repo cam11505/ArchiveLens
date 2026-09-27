@@ -414,11 +414,79 @@ def verify_dmg(dmg: Path, commit: str, *, team: str | None = None) -> dict:
             return {
                 "success": True,
                 "development": team is None,
+                "channel": "development" if team is None else "release",
+                "version": result["build_info"]["version"],
+                "source_commit": result["build_info"]["source_commit"],
+                "os": "macos",
+                "architecture": "arm64",
+                "artifact_kind": "dmg",
+                "parity_baseline": result["build_info"]["parity_baseline"],
                 "native_count": result["native_count"],
             }
         finally:
             if attached:
                 run(["hdiutil", "detach", str(mount)], stage="DMG detach")
+
+
+def file_sha256(path: Path) -> str:
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def development_inventory(dmg: Path, commit: str, result: dict) -> dict:
+    """Record download integrity, not signing/notarization approval."""
+    if result.get("development") is not True or result.get("source_commit") != commit:
+        raise ReleaseError("Development inventory must match the verified development app")
+    inventory = {
+        **result,
+        "schema_version": 1,
+        "release_eligible": False,
+        "artifact": dmg.name,
+        "sha256": file_sha256(dmg),
+        "signing": "unsigned-or-ad-hoc",
+        "notarization": "not-performed",
+    }
+    (dmg.parent / "development-manifest.json").write_text(
+        json.dumps(inventory, indent=2) + "\n", encoding="utf-8"
+    )
+    (dmg.parent / "SHA256SUMS.txt").write_text(
+        f"{inventory['sha256']}  {dmg.name}\n", encoding="utf-8"
+    )
+    return inventory
+
+
+def verify_development_inventory(dmg: Path, commit: str) -> dict:
+    expected_name = f"ArchiveLens-{__version__}-macos-arm64-development.dmg"
+    if dmg.name != expected_name or dmg.is_symlink() or not dmg.is_file():
+        raise ReleaseError("Expected a clearly named development DMG file")
+    try:
+        inventory = json.loads(
+            (dmg.parent / "development-manifest.json").read_text(encoding="utf-8")
+        )
+        checksums = (dmg.parent / "SHA256SUMS.txt").read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        raise ReleaseError("Missing or invalid development download inventory") from None
+    expected = {
+        "schema_version": 1,
+        "channel": "development",
+        "version": __version__,
+        "source_commit": commit,
+        "os": "macos",
+        "architecture": "arm64",
+        "artifact_kind": "dmg",
+        "artifact": expected_name,
+        "signing": "unsigned-or-ad-hoc",
+        "notarization": "not-performed",
+        "sha256": file_sha256(dmg),
+    }
+    if (
+        any(inventory.get(key) != value for key, value in expected.items())
+        or inventory.get("development") is not True
+        or inventory.get("release_eligible") is not False
+        or checksums != f"{expected['sha256']}  {expected_name}\n"
+    ):
+        raise ReleaseError("Development SHA-256/commit/channel inventory mismatch")
+    return inventory
 
 
 def official(root: Path, commit: str, values: dict) -> dict:
@@ -498,7 +566,9 @@ def official(root: Path, commit: str, values: dict) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("official", "development-dmg", "verify"))
+    parser.add_argument(
+        "mode", choices=("official", "development-dmg", "verify-development", "verify")
+    )
     parser.add_argument("--expected-commit", required=True)
     parser.add_argument("--dmg", type=Path)
     parser.add_argument("--team-id")
@@ -520,9 +590,26 @@ def main() -> int:
 
             app = root / "dist/ArchiveLens.app"
             inspect_structure(app, args.expected_commit, allow_development=True)
-            dmg = root / "outputs/macos-dmg-development/ArchiveLens-development-not-for-release.dmg"
+            dmg = (
+                root
+                / "outputs/macos-dmg-development"
+                / f"ArchiveLens-{__version__}-macos-arm64-development.dmg"
+            )
             create_dmg(app, dmg)
             result = verify_dmg(dmg, args.expected_commit)
+            result = development_inventory(dmg, args.expected_commit, result)
+        elif args.mode == "verify-development":
+            if not args.dmg or args.team_id:
+                raise ReleaseError(
+                    "Development verify requires --dmg and no official team identity"
+                )
+            dmg = args.dmg.absolute()
+            inventory = verify_development_inventory(dmg, args.expected_commit)
+            result = {
+                **inventory,
+                **verify_dmg(dmg, args.expected_commit),
+                "release_eligible": False,
+            }
         else:
             if not args.dmg or not args.team_id or not re.fullmatch(r"[A-Z0-9]{10}", args.team_id):
                 raise ReleaseError("Official verify requires --dmg and --team-id")
