@@ -11,6 +11,7 @@ from typing import Self
 from PySide6.QtGui import QImage
 
 from archivelens.archive.credentials import ArchiveCredentials
+from archivelens.errors import ContentAccessError
 
 
 class SourceType(StrEnum):
@@ -54,7 +55,10 @@ def source_identity_for_path(
     path: str | Path, source_type: SourceType, *, scan_signature: str = ""
 ) -> SourceIdentity:
     source = Path(path)
-    canonical = os.path.normcase(str(source.resolve(strict=False)))
+    try:
+        canonical = os.path.normcase(str(source.resolve(strict=False)))
+    except (OSError, RuntimeError) as exc:
+        raise ContentAccessError() from exc
     try:
         stat = source.stat()
     except OSError:
