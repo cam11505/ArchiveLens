@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from archivelens import __version__
+from archivelens.macos_documents import document_types
 
 
 def load_script(name):
@@ -18,7 +19,7 @@ def load_script(name):
     return module
 
 
-def fake_app(tmp_path, *, development=True, document_types=False):
+def fake_app(tmp_path, *, development=True, invalid_document_types=False):
     app = tmp_path / "ArchiveLens.app"
     contents = app / "Contents"
     executable = contents / "MacOS" / "ArchiveLens"
@@ -30,7 +31,8 @@ def fake_app(tmp_path, *, development=True, document_types=False):
         "CFBundleShortVersionString": __version__,
         "CFBundleVersion": __version__,
     }
-    if document_types:
+    plist["CFBundleDocumentTypes"] = document_types()
+    if invalid_document_types:
         plist["CFBundleDocumentTypes"] = []
     with (contents / "Info.plist").open("wb") as stream:
         plistlib.dump(plist, stream)
@@ -91,8 +93,8 @@ def test_macos_bundle_rejects_release_claim_and_finder_scope(tmp_path):
     app = fake_app(tmp_path)
     with pytest.raises(ValueError, match="allow-development"):
         module.inspect_structure(app, "a" * 40, allow_development=False)
-    app = fake_app(tmp_path / "finder", document_types=True)
-    with pytest.raises(ValueError, match="issue #47"):
+    app = fake_app(tmp_path / "finder", invalid_document_types=True)
+    with pytest.raises(ValueError, match="allowlist"):
         module.inspect_structure(app, "a" * 40, allow_development=True)
 
 
@@ -110,7 +112,7 @@ def test_macos_spec_keeps_later_issue_scope_out():
     )
     assert 'target_arch="arm64"' in spec
     assert "argv_emulation=False" in spec
-    assert "CFBundleDocumentTypes" not in spec
+    assert '"CFBundleDocumentTypes": document_types()' in spec
     assert "codesign_identity" not in spec
 
 

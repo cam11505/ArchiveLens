@@ -5,11 +5,23 @@ from PySide6.QtWidgets import QMainWindow, QToolBar
 
 
 def make_action(
-    window: QMainWindow, text: str, callback: Callable, shortcuts: list[str]
+    window: QMainWindow,
+    text: str,
+    callback: Callable,
+    shortcuts: list[str],
+    *,
+    standard_key: QKeySequence.StandardKey | None = None,
+    menu_role: QAction.MenuRole = QAction.MenuRole.NoRole,
 ) -> QAction:
     action = QAction(text, window)
     action.triggered.connect(callback)
-    action.setShortcuts([QKeySequence(key) for key in shortcuts])
+    keys = QKeySequence.keyBindings(standard_key) if standard_key is not None else []
+    for key in shortcuts:
+        sequence = QKeySequence(key)
+        if sequence not in keys:
+            keys.append(sequence)
+    action.setShortcuts(keys)
+    action.setMenuRole(menu_role)
     window.addAction(action)
     return action
 

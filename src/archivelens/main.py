@@ -18,6 +18,7 @@ def main() -> int:
     parser.add_argument("--version", action="version", version=f"ArchiveLens {__version__}")
     parser.add_argument("--self-test-report", type=Path, help="Run GUI diagnostics and write JSON")
     parser.add_argument("--self-test-screenshot", type=Path, help="Save the diagnostic window")
+    parser.add_argument("--open-event-report", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     QImageReader.setAllocationLimit(IMAGE_ALLOCATION_LIMIT_MB)
     app = ArchiveLensApplication(sys.argv[:1])
@@ -29,18 +30,22 @@ def main() -> int:
     )
     settings = None
     reading_store = None
-    if args.self_test_report:
+    diagnostic_report = args.self_test_report or args.open_event_report
+    if diagnostic_report:
         from PySide6.QtCore import QSettings
 
-        settings = QSettings(
-            str(args.self_test_report.with_suffix(".ini")), QSettings.Format.IniFormat
-        )
+        settings = QSettings(str(diagnostic_report.with_suffix(".ini")), QSettings.Format.IniFormat)
         settings.clear()
         from archivelens.reading_state import ReadingStateStore
 
-        reading_store = ReadingStateStore(args.self_test_report.with_suffix(".reading-state.json"))
+        reading_store = ReadingStateStore(diagnostic_report.with_suffix(".reading-state.json"))
     window = MainWindow(settings=settings, reading_store=reading_store)
-    app.set_open_source_handler(window.open_content)
+    if args.open_event_report:
+        from archivelens.open_event_probe import OpenEventProbe
+
+        window._open_event_probe = OpenEventProbe(app, window, args.open_event_report)
+    else:
+        app.set_open_source_handler(window.open_content)
     window.set_open_source_handler(app.open_source)
     window.show()
     if args.self_test_report:

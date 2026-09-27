@@ -1,6 +1,7 @@
 # Self-contained macOS arm64 application bundle for ArchiveLens v1.3 issue #46.
 import os
 from pathlib import Path
+from archivelens.macos_documents import document_types
 
 root = Path(SPECPATH).parent
 metadata_dir = Path(os.environ["ARCHIVELENS_MACOS_METADATA_DIR"])
@@ -84,5 +85,6 @@ app = BUNDLE(
         "CFBundleShortVersionString": version,
         "CFBundleVersion": version,
         "NSHighResolutionCapable": True,
+        "CFBundleDocumentTypes": document_types(),
     },
 )

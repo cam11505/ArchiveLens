@@ -11,7 +11,6 @@ and the shipped-codec/QtPdf qualification from #45; it does not repeat those spi
 
 Explicit exclusions:
 
-- no Finder document declarations or Open With behavior (#47);
 - no DMG, Developer ID identity, hardened-runtime policy, notarization, or staple (#49);
 - no Linux package;
 - no HEIC/HEIF or JPEG XL/JXL support.
@@ -39,7 +38,9 @@ python scripts/build_macos_app.py --development
 - `build-info.json` and `compiled-source.json`.
 
 The bundle identifier is `com.cam11505.archivelens`. `argv_emulation` is disabled;
-Finder file events and document declarations remain owned by #47.
+Issue #47 adds alternate-viewer Finder declarations for CBZ, CBR, ZIP, RAR, 7Z,
+and PDF. No direct-image or folder document types are declared and no default
+association is set. Folder opening remains available through Open Folder/drag-drop.
 
 ## Build metadata
 
@@ -66,7 +67,8 @@ python scripts/verify_macos_app.py dist/ArchiveLens.app \
 
 Verification checks:
 
-- bundle identity/version and absence of #47 document declarations;
+- bundle identity/version and exact six-type Finder declarations with Viewer role
+  and Alternate rank;
 - required metadata, notices, licenses, QtPdf, image plugins, and RAR runtime;
 - exclusion of QtWebEngine;
 - arm64 architecture for every Mach-O file found in the bundle;
@@ -76,3 +78,18 @@ Verification checks:
 
 The workflow archives the verified `.app` with `ditto` only as CI evidence. It is
 not the official v1.3 DMG and must not be published as a signed/notarized release.
+
+## Issue #47 native integration
+
+Open, Quit, and fullscreen use Qt standard keys; About, Quit, and macOS Preferences
+use explicit menu roles. Existing bookmark/folder keys map to Command on macOS
+through Qt. Preferences edits only existing cover and recursive-folder settings.
+Logical previous/next retain their meaning in RTL; only arrow actions reverse.
+
+The macOS workflow also runs `scripts/verify_macos_open_events.py` against a copied
+packaged app outside the checkout. Real LaunchServices cold CBZ and warm PDF opens
+must reach the shared source-open boundary and load a page; JSON evidence is
+uploaded with the app. This is hosted-runner evidence, not physical Finder menu QA.
+
+References: [Qt standard keys](https://doc.qt.io/qt-6/qkeysequence.html) and
+[Apple document roles/rank](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html).
