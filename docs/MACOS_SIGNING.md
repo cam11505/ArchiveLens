@@ -76,6 +76,8 @@ repository permission and does not publish or tag.
 4. Build an official candidate with `channel=release`, `development=false`.
 5. Sign nested Mach-O files/framework bundles inside-out with Developer ID,
    hardened runtime and secure timestamp. `--deep` is used only to verify, not sign.
+   Record the signed UnRAR bytes as `signed_sha256` before sealing the outer app;
+   retain its original backend provenance `sha256`. Verify the signed hash again.
 6. Check all native signatures, Team ID, authority, timestamp and entitlements,
    then run the packaged self-test without credential environment variables.
 7. Submit an app ZIP with `notarytool --wait`; require `Accepted`. Staple and validate

@@ -47,10 +47,10 @@ class ReleaseError(RuntimeError):
     """Safe, deliberately non-sensitive diagnostic."""
 
 
-def run(command: list[str], *, stage: str, timeout: int = 600, env=None) -> str:
+def run(command: list[str], *, stage: str, timeout: int = 600, env=None, cwd=None) -> str:
     try:
         result = subprocess.run(
-            command, capture_output=True, text=True, timeout=timeout, env=env, check=False
+            command, capture_output=True, text=True, timeout=timeout, env=env, cwd=cwd, check=False
         )
     except (OSError, subprocess.TimeoutExpired):
         raise ReleaseError(f"{stage} could not complete; no official artifact approved") from None
@@ -203,6 +203,20 @@ def sign_app(app: Path, identity: str, keychain: Path, entitlements: Path) -> No
     # Sign innermost code first. --deep is only a verification option, never a signing shortcut.
     targets = sorted(macho_files(app) + bundles, key=lambda path: (-len(path.parts), str(path)))
     for target in [*targets, app]:
+        if target == app:
+            # Signing changes native bytes. Preserve provenance hash and record the actual
+            # signed backend hash before sealing the outer app's resource envelope.
+            info_path = app / "Contents/Resources/build-info.json"
+            if info_path.is_file():
+                info = json.loads(info_path.read_text(encoding="utf-8"))
+                backend = app / "Contents/Frameworks/native/libunrar.dylib"
+                with backend.open("rb") as stream:
+                    info["native_backends"]["rar"]["signed_sha256"] = hashlib.file_digest(
+                        stream, "sha256"
+                    ).hexdigest()
+                info_path.write_text(
+                    json.dumps(info, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                )
         run(
             [
                 "codesign",
@@ -260,6 +274,11 @@ def inspect_signature(target: Path, team: str, *, runtime: bool) -> None:
 
 
 def verify_signed_app(app: Path, team: str, *, stapled: bool) -> None:
+    info = json.loads((app / "Contents/Resources/build-info.json").read_text(encoding="utf-8"))
+    with (app / "Contents/Frameworks/native/libunrar.dylib").open("rb") as stream:
+        backend_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+    if info["native_backends"]["rar"].get("signed_sha256") != backend_hash:
+        raise ReleaseError("Signed backend hash does not match sealed metadata")
     for target in [*macho_files(app), app]:
         inspect_signature(target, team, runtime=True)
     run(
@@ -405,8 +424,11 @@ def verify_dmg(dmg: Path, commit: str, *, team: str | None = None) -> dict:
 def official(root: Path, commit: str, values: dict) -> dict:
     from verify_macos_app import inspect_structure, run_self_test, verify_native_architecture
 
-    actual = run(["git", "rev-parse", "HEAD"], stage="Source commit").strip()
-    if actual != commit or run(["git", "status", "--porcelain"], stage="Clean source").strip():
+    actual = run(["git", "rev-parse", "HEAD"], stage="Source commit", cwd=root).strip()
+    if (
+        actual != commit
+        or run(["git", "status", "--porcelain"], stage="Clean source", cwd=root).strip()
+    ):
         raise ReleaseError("Official build requires the exact clean source commit")
     destination = (
         root / "dist" / "macos-official-candidate" / f"ArchiveLens-{__version__}-macos-arm64.dmg"

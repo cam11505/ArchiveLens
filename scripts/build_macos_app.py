@@ -94,6 +94,8 @@ def compiled_source_fingerprints(root: Path) -> dict[str, str]:
             root / "scripts" / "build_macos_app.py",
             root / "scripts" / "frozen_entry.py",
             root / "scripts" / "verify_macos_app.py",
+            root / "scripts" / "macos_release.py",
+            root / "scripts" / "macos-entitlements.plist",
         ]
     )
     return {path.relative_to(root).as_posix(): sha256(path) for path in paths}

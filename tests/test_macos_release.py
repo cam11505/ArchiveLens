@@ -259,6 +259,39 @@ def test_signature_without_exceptions_accepted(monkeypatch):
     loaded.inspect_signature(Path("candidate"), "ABCDEFGHIJ", runtime=True)
 
 
+def test_signed_backend_hash_sealed_before_outer_signature(tmp_path, monkeypatch):
+    import hashlib
+
+    loaded = module()
+    app = tmp_path / "ArchiveLens.app"
+    backend = app / "Contents/Frameworks/native/libunrar.dylib"
+    backend.parent.mkdir(parents=True)
+    backend.write_bytes(b"\xcf\xfa\xed\xfefixture")
+    info_path = app / "Contents/Resources/build-info.json"
+    info_path.parent.mkdir(parents=True)
+    info_path.write_text(json.dumps({"native_backends": {"rar": {"sha256": "input"}}}))
+    entitlements = tmp_path / "entitlements.plist"
+    entitlements.write_bytes(plistlib.dumps({}))
+    outer_signed = []
+
+    def run(command, **kwargs):
+        if command[-1] == str(backend):
+            backend.write_bytes(backend.read_bytes() + b"signature")
+        if command[-1] == str(app):
+            sealed = json.loads(info_path.read_text())["native_backends"]["rar"]
+            assert sealed["sha256"] == "input"
+            assert sealed["signed_sha256"] == hashlib.sha256(backend.read_bytes()).hexdigest()
+            outer_signed.append(True)
+        return ""
+
+    monkeypatch.setattr(loaded, "run", run)
+    loaded.sign_app(app, "identity", Path("keychain"), entitlements)
+    assert outer_signed == [True]
+    backend.write_bytes(b"tampered")
+    with pytest.raises(loaded.ReleaseError, match="Signed backend hash"):
+        loaded.verify_signed_app(app, "ABCDEFGHIJ", stapled=True)
+
+
 def test_workflow_official_is_separated_and_success_only():
     root = Path(__file__).parents[1]
     workflow = (root / ".github/workflows/v13-macos-official.yml").read_text()
