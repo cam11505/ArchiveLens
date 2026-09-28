@@ -12,6 +12,8 @@
   checksum, SPDX/license, source and native backend provenance verification.
 - Added cross-provider reading-state and active-render source-switch regressions,
   native RAR preparation on all source CI platforms and retained reader smoke reports.
+- Removed the Windows-only RAR diagnostic condition so source and packaged reader
+  self-tests on macOS/Linux also require real solid/encrypted RAR reads and immutability.
 - Documented development downloads, platform support, regression coverage and limits.
   Official Developer ID/notarization/staple/Gatekeeper, RC/tag/release and physical
   Mac QA remain deferred. No official v1.3 release or Linux package is implied.

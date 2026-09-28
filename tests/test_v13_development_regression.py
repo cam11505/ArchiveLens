@@ -6,6 +6,8 @@ from zipfile import ZipFile
 
 import pytest
 
+from archivelens.archive.rar_provider import RarArchiveProvider
+from archivelens.backend_self_test import check_backends
 from archivelens.content.base import SourceType, source_identity_for_path
 from archivelens.content.pdf_provider import PdfContentProvider
 from archivelens.diagnostic_fixtures import write_pdf_fixture
@@ -21,6 +23,11 @@ def snapshot(directory):
         for path in directory.rglob("*")
         if path.is_file()
     }
+
+
+@pytest.mark.skipif(not RarArchiveProvider.capabilities.available, reason="Prepared UnRAR required")
+def test_reader_backend_smoke_requires_rar_on_every_platform(image_bytes):
+    assert "bundled_rar4_rar5_solid_encrypted_backend" in check_backends(image_bytes())
 
 
 def sources(directory, image_bytes):

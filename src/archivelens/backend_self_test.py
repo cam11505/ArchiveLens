@@ -1,7 +1,6 @@
 """Real-backend smoke checks also executed inside the frozen application."""
 
 import hashlib
-import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -45,20 +44,23 @@ def check_backends(image):
                     "encrypted.7z": "encrypted_7z_backend",
                 }[path.name]
             )
-        if sys.platform == "win32":
-            relative = "self-test-rar" if is_frozen_runtime() else "tests/fixtures/rar"
-            fixtures = runtime_root() / relative
-            for name in ("rar3-solid.rar", "rar5-solid.rar", "rar5-hpsw.rar"):
-                path = fixtures / name
-                with (
-                    ArchiveCredentials(b"password") as creds,
-                    DEFAULT_REGISTRY.create(path) as provider,
-                ):
-                    provider.open(path, credentials=creds)
-                    assert all(
-                        len(provider.read_entry(e)) == e.uncompressed_size
-                        for e in provider.list_entries()
-                    )
-            checks.append("bundled_rar4_rar5_solid_encrypted_backend")
+        # All supported source/packaged paths use the same approved RAR seam.
+        # Missing native RAR must fail the diagnostic, not silently omit parity.
+        relative = "self-test-rar" if is_frozen_runtime() else "tests/fixtures/rar"
+        fixtures = runtime_root() / relative
+        for name in ("rar3-solid.rar", "rar5-solid.rar", "rar5-hpsw.rar"):
+            path = fixtures / name
+            before = hashlib.sha256(path.read_bytes()).digest()
+            with (
+                ArchiveCredentials(b"password") as creds,
+                DEFAULT_REGISTRY.create(path) as provider,
+            ):
+                provider.open(path, credentials=creds)
+                assert all(
+                    len(provider.read_entry(e)) == e.uncompressed_size
+                    for e in provider.list_entries()
+                )
+            assert hashlib.sha256(path.read_bytes()).digest() == before
+        checks.append("bundled_rar4_rar5_solid_encrypted_backend")
         assert set(root.iterdir()) == {zip_path, crypto, seven}
     return checks
