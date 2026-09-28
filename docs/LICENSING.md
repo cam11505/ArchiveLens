@@ -40,6 +40,13 @@ Its original terms remain in effect.
 
 ## Windows runtime distribution
 
+macOS development app/DMG testing is separate from an official release. Its
+bundled notices, audited policy, SPDX and upstream source metadata are verified,
+but metadata alone is not proof of a complete official corresponding-source
+delivery set. The full official cross-platform distribution gate remains pending;
+see `ARTIFACT_VERIFICATION.md` and `V1.3_DEVELOPMENT_QA.md`. No licensing requirement
+is waived by the development-only scope decision.
+
 The current Windows portable and installer releases combine components with different
 licenses. The exact version/source/license files collected for a release are packaged
 under `licenses/`, described in `THIRD_PARTY_NOTICES.md`, and recorded in the release

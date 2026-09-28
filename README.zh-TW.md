@@ -3,6 +3,16 @@
 本機、唯讀、無遙測。直接閱讀圖片壓縮檔、圖片資料夾與 PDF，不修改來源，
 也不把整本內容解壓或複製到暫存資料夾。
 
+## v1.3 開發狀態（尚未發布）
+
+Windows x64 仍是正式封裝平台。macOS Apple Silicon arm64 已有獨立的**開發版**
+app／DMG，於 GitHub-hosted `macos-15` 驗證；僅 unsigned／ad-hoc，未公證。
+Ubuntu x64 僅保留原始碼 CI，沒有 Linux／Intel／Universal2 套件或正式 v1.3.0 Release。
+正式簽署／公證、RC／tag／Release 與實體 Mac QA 均 deferred。
+下載與驗證方式見 [macOS 開發版](docs/MACOS_DEVELOPMENT.md)，測試範圍與平台狀態見
+[開發版回歸矩陣](docs/V1.3_DEVELOPMENT_QA.md) 與
+[共同成品驗證](docs/ARTIFACT_VERIFICATION.md)。
+
 ## 功能
 
 - ZIP／CBZ、7Z、RAR／CBR、一般／遞迴圖片資料夾與本機 PDF。
@@ -34,6 +44,10 @@
 | F／F11／Esc | 全螢幕／退出 |
 | T | 縮圖側欄 |
 | Ctrl+B | 加入／移除目前頁書籤 |
+
+macOS 開發版使用 Qt 標準開啟快捷鍵 Cmd+O 與原生選單角色；其他指令以選單顯示的快捷鍵為準。
+Finder／開啟方式僅宣告支援的壓縮檔與 PDF；資料夾使用「開啟資料夾」或拖放，
+不宣告直接開啟單張圖片。
 
 「檔案 > 開啟內容」保留原生檔案／資料夾選擇器；「檢視」選單可設定版面、Fit 與邊框裁切；「閱讀」選單可設定方向、封面、
 遞迴資料夾、書籤與最近閱讀。
