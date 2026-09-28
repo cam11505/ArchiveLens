@@ -1,4 +1,4 @@
-# ArchiveLens 1.2 development
+# ArchiveLens development
 
 The normative scope and release order are in `V1.2_PLAN.md`. `PROVIDERS.md`
 defines source/provider ownership, while `IMAGE_BACKENDS.md`, `QTPDF_BACKEND.md`
@@ -43,10 +43,11 @@ archives. Build from a clean committed checkout, then run `build_portable.py`,
 `verify_installer.py`, and `release_checksums.py`. Build metadata records the exact commit;
 portable and installer verification reject a different commit or incomplete manifest.
 
-CI repeats source tests on Windows/Linux and full portable/installer checks on a clean
-Windows runner. Do not tag v1.2.2 until the exact-commit CI artifacts, local checksum
-verification and `V1.2.2_QA.md` release-candidate decisions are complete. Automated
-offscreen tests are not evidence of physical Explorer or multi-monitor behavior.
+CI repeats source tests and approved RAR backend preparation on Windows/macOS/Ubuntu,
+retains JUnit and source reader self-test reports, and runs full portable/installer
+checks on a clean Windows runner. Automated offscreen tests are not evidence of
+physical Explorer, multi-monitor or Mac hardware behavior. Historical v1.2.2 QA
+documents are release-specific records, not current v1.3 release approval.
 
 ## macOS arm64 development app
 
@@ -54,3 +55,11 @@ v1.3 issue #46 adds a native, self-contained development `ArchiveLens.app`. Buil
 verification commands, metadata, included runtimes, and the explicit #47/#49 scope
 boundaries are documented in `MACOS_PACKAGING.md`. The bundle is unsigned/ad-hoc and
 must not be represented as an official macOS release.
+
+`V1.3_PLAN.md` defines current scope. `MACOS_DEVELOPMENT.md` describes CI downloads,
+exact tested commit identification and independent development DMG verification.
+`ARTIFACT_VERIFICATION.md` describes common versus native/platform checks.
+`V1.3_DEVELOPMENT_QA.md` records the authorized #51 development-only regression
+subset and official/manual blockers. Version stays 1.2.2 during this work.
+Do not run the protected official workflow or create an RC/tag/release while the
+formal signing/notarization/staple/Gatekeeper gates remain unresolved.

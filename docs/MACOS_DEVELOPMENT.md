@@ -75,7 +75,9 @@ and source immutability. Existing physical checklist:
 - Development app/DMG and source/Windows regression may continue without payment.
 - Developer ID, hardened-runtime official qualification, notarization/staple and
   official Gatekeeper verification remain deferred, not passed.
-- PR #70 is merged; #50 development-only integration is in progress. Do not close
-  its official acceptance criteria with this development evidence.
+- PR #70 and PR #71 are merged; #50 credential-free integration passed at
+  `e03405cddd7ab338d00ed0da215b828cdc6d2fea`. Its official acceptance stays open.
+- On 2026-09-28 the user authorized #51 development regression/documentation only;
+  see [the regression record](V1.3_DEVELOPMENT_QA.md). It is not an official RC gate.
 - #51 official RC, `v1.3.0` tag and official release remain blocked until the user
   resumes the official track and all mandatory gates pass.

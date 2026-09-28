@@ -1,4 +1,4 @@
-# v1.1 backend and redistribution record (#5, #13)
+# Archive backend and redistribution record
 
 | Format | Backend | License | Native code |
 | --- | --- | --- | --- |
@@ -19,6 +19,13 @@ libraries. Rebuild against modified dependencies with the provided source/spec;
 reverse engineering to debug library modifications is permitted.
 
 ## UnRAR spike outcome
+
+Current development regression prepares this same approved native backend on
+Windows/macOS/Ubuntu before source tests. This does not redo the historical Go
+decision or imply a Linux package. Final macOS development bytes may differ after
+PyInstaller relocation/ad-hoc signing; prepared and packaged hashes are retained
+separately in build-info and verified against the actual bundled backend.
+See `ARTIFACT_VERIFICATION.md` and `V1.3_DEVELOPMENT_QA.md`.
 
 Windows SDK: https://www.rarlab.com/rar/unrardll-723.exe (7.23 stable).
 SDK SHA-256: 68b064b34691988158c4126d3cf422f4e74a7d1d618c26bafc93b4e502b88b55.

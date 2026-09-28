@@ -25,11 +25,13 @@ on:
       - "tests/test_macos_app_bundle.py"
       - "tests/test_macos_release.py"
       - "tests/test_artifact_contract.py"
+      - "tests/test_v13_development_regression.py"
       - "tests/test_v13_retina_paths.py"
       - "tests/fixtures/rar/**"
       - "docs/MACOS_PACKAGING.md"
       - "docs/MACOS_SIGNING.md"
       - "docs/MACOS_DEVELOPMENT.md"
+      - "docs/V1.3_DEVELOPMENT_QA.md"
       - "docs/MACOS_RETINA_PATHS.md"
 
 permissions:
@@ -46,13 +48,14 @@ jobs:
       - run: python -m pip install -c constraints-build.txt -e ".[dev,build]"
       - run: python -m ruff check src tests scripts
       - run: python -m ruff format --check src tests scripts
+      - name: Prepare approved native backend before source regression
+        run: python scripts/prepare_backends.py
       - run: python -m pytest -q
         env:
           QT_QPA_PLATFORM: offscreen
       - name: Audit and stage approved runtime dependencies
         run: |
           python scripts/license_audit.py --check
-          python scripts/prepare_backends.py
           python scripts/prepare_licenses.py
       - name: Build self-contained development app
         run: python scripts/build_macos_app.py --development

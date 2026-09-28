@@ -29,13 +29,22 @@ jobs:
       - name: Audit runtime dependency licenses
         run: python scripts/license_audit.py --check
       - name: Prepare bundled RAR backend
-        if: runner.os == 'Windows'
         run: python scripts/prepare_backends.py
       - run: python -m ruff check src tests scripts
       - run: python -m ruff format --check src tests scripts
-      - run: python -m pytest -q
+      - run: python -m pytest -q --junitxml=outputs/source-regression/junit.xml
         env:
           QT_QPA_PLATFORM: offscreen
+      - name: Development source reader regression (not an RC)
+        run: python -m archivelens --self-test-report outputs/source-regression/self-test.json
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: ArchiveLens-source-regression-${{ matrix.os }}
+          path: outputs/source-regression/*
+          if-no-files-found: warn
   portable:
     needs: tests
     runs-on: windows-latest

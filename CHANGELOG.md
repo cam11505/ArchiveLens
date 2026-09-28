@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — v1.3 development (not an RC or release)
+
+- Added narrow platform/runtime seams and unified startup, Finder, File/Open and
+  drag/drop routing without replacing the provider/worker/Qt reader architecture.
+- Qualified the pinned UnRAR 7.23 backend on Windows x64, macOS arm64 and Linux x64;
+  retained the shipped v1.2.2 codecs/QtPdf and opaque-white PDF page policy.
+- Added a self-contained macOS arm64 development app/DMG, approved archive/PDF
+  Finder types, native menu roles and automated Retina/path regression coverage.
+- Added independent Windows/macOS/Ubuntu source CI and shared metadata,
+  checksum, SPDX/license, source and native backend provenance verification.
+- Added cross-provider reading-state and active-render source-switch regressions,
+  native RAR preparation on all source CI platforms and retained reader smoke reports.
+- Removed the Windows-only RAR diagnostic condition so source and packaged reader
+  self-tests on macOS/Linux also require real solid/encrypted RAR reads and immutability.
+- Documented development downloads, platform support, regression coverage and limits.
+  Official Developer ID/notarization/staple/Gatekeeper, RC/tag/release and physical
+  Mac QA remain deferred. No official v1.3 release or Linux package is implied.
+
 ## 1.2.2 — 2026-09-18
 
 - Fixed PDFs with an implicit transparent page background rendering as black text over

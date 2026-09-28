@@ -5,6 +5,17 @@
 A local, read-only Windows reader for image archives, image folders and PDF files.
 No telemetry, cloud service, source modification or whole-book extraction.
 
+## v1.3 development status (not released)
+
+Windows x64 remains the official packaged platform. macOS Apple Silicon arm64
+has a self-contained **development-only** app/DMG tested on GitHub-hosted
+`macos-15`; it is unsigned/ad-hoc and not notarized. Ubuntu x64 retains source CI
+only. There is no official v1.3.0 release or Linux/Intel/Universal2 package.
+Official signing/notarization, RC/tag/release and physical Mac QA are deferred.
+See [development downloads and verification](docs/MACOS_DEVELOPMENT.md),
+[platform/regression matrix](docs/V1.3_DEVELOPMENT_QA.md) and
+[shared artifact contract](docs/ARTIFACT_VERIFICATION.md).
+
 ## Features
 
 - ZIP/CBZ, 7Z, RAR/CBR, flat/recursive image folders and local PDF documents.
@@ -36,7 +47,8 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m archivelens
 ```
 
-`prepare_backends.py` downloads and verifies the official UnRAR 7.21 SDK on Windows.
+`prepare_backends.py` downloads and verifies the official UnRAR 7.23 SDK on Windows;
+on macOS/Linux it builds the pinned 7.23 portable source (native compiler required).
 The GUI opens all supported content sources. The compatibility CLI only lists images
 inside archive files and does not prompt for passwords.
 
@@ -60,6 +72,10 @@ gates. See [image backend decisions](docs/IMAGE_BACKENDS.md).
 | F / F11 / Esc | Fullscreen/leave fullscreen |
 | T | Thumbnail sidebar |
 | Ctrl+B | Add/remove the current page bookmark |
+
+macOS development builds use Qt's standard Open shortcut (Cmd+O) and native
+menu roles; use the shortcut displayed in each menu for other commands. Finder/Open With declarations cover
+archives and PDF only; folders use Open Folder/drag-drop, not direct-image opens.
 
 Use File > Open Content for the native file/folder choices. Use View for page layout, fit and border trim. Use Reading for direction, cover,
 recursive-folder mode, bookmarks and recent history.
